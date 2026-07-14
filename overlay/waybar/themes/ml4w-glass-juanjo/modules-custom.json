@@ -1,0 +1,24 @@
+{
+    // Temperatura CPU — módulo nativo de waybar.
+    // Ruta ESTABLE por hwmon-path-abs + input-filename (hwmonN cambia entre arranques).
+    // Verificado: /sys/devices/platform/coretemp.0/hwmon/hwmonN/temp1_input = "Package id 0".
+    "temperature": {
+        "hwmon-path-abs": "/sys/devices/platform/coretemp.0/hwmon",
+        "input-filename": "temp1_input",
+        "critical-threshold": 85,
+        "interval": 5,
+        "format": "󰔏 {temperatureC}°C",
+        "format-critical": "󰸁 {temperatureC}°C",
+        "tooltip": true,
+        "on-click": "~/.config/ml4w/settings/system-monitor.sh"
+    },
+    // Temperatura GPU NVIDIA (Optimus) — script condicional: solo consulta nvidia-smi si la
+    // dGPU ya está despierta (runtime_status=active); si duerme, NO la despertamos.
+    "custom/gputemp": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/gputemp.sh",
+        "interval": 5,
+        "tooltip": true,
+        "tooltip-format": "GPU NVIDIA GTX 1060 Mobile",
+        "on-click": "~/.config/ml4w/settings/system-monitor.sh"
+    }
+}

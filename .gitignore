@@ -1,0 +1,30 @@
+# Capa de seguridad: nunca versionar datos privados / secretos / temporales.
+# El overlay solo debe contener theme (CSS/JSON/config) + scripts. Cualquier otra cosa,
+# fuera del repo.
+
+# Logs y backups de ML4W
+*.log
+backups/
+
+# Secretos / credenciales
+*.token
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*
+*_rsa
+*_ed25519
+id_*
+*.gpg
+secrets*
+credentials*
+
+# Temporales del editor / SO
+*~
+*.swp
+*.swo
+*.bak
+*.orig
+.DS_Store
