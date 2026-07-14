@@ -272,6 +272,7 @@ window#waybar.empty #window {
 #clock {
     margin-left: 12px;
     margin-right: 12px;
+    font-size: 18px;
 }
 
 #clock:hover {
