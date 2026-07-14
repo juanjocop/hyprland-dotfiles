@@ -17,6 +17,7 @@ OURS=(
   waybar/themes/ml4w-glass-juanjo/scripts/gputemp.sh
   waybar/themes/ml4w-glass-juanjo/default/style.css
   waybar/themes/ml4w-glass-juanjo/default/config.sh
+  hypr/hyprsunset.conf
 )
 for f in "${OURS[@]}"; do
   over="$ROOT/overlay/$f"; live="$LIVE/$f"
@@ -44,6 +45,11 @@ done
 # 3) Verificar que el theme activo sea el nuestro.
 grep -q "ml4w-glass-juanjo" "$HOME/.config/ml4w/settings/waybar-theme.sh" 2>/dev/null \
   || { echo "⚠  el theme activo NO es ml4w-glass-juanjo  → ./aplicar.sh"; status=1; }
+
+# 4) Verificar que el daemon de luz nocturna (hyprsunset) esté activo vía systemd.
+if ! systemctl --user is-active --quiet hyprsunset.service; then
+  echo "⚠  hyprsunset.service NO activo  → ./aplicar.sh (o systemctl --user restart hyprsunset.service)"; status=1
+fi
 
 [[ $status -eq 0 ]] && echo "✔  todo en sync (theme propio desplegado y activo; base sin cambios)."
 exit $status

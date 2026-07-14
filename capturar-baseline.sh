@@ -10,6 +10,7 @@ BASE=(
   waybar/themes/ml4w-glass/config
   waybar/themes/ml4w-glass/style.css
   waybar/themes/ml4w-glass/default/style.css
+  hypr/hyprsunset.conf
 )
 
 for f in "${BASE[@]}"; do

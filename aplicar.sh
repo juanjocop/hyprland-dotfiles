@@ -22,4 +22,12 @@ echo "/$THEME;/$THEME/default" > "$DEST/ml4w/settings/waybar-theme.sh"
 #    de theme, no solo de contenido.
 "$DEST/waybar/launch.sh" >/dev/null 2>&1 &
 
-echo "✔  Overlay aplicado (theme $THEME activo)."
+# 5. Luz nocturna (hyprsunset): desplegar config con horario y arrancar el daemon vía systemd
+#    (unit empaquetada, persistente en cada login). No es archivo de ML4W → cero deriva.
+mkdir -p "$DEST/hypr"
+cp -f "$ROOT/overlay/hypr/hyprsunset.conf" "$DEST/hypr/hyprsunset.conf"
+systemctl --user enable hyprsunset.service >/dev/null 2>&1 || true
+pkill -x hyprsunset 2>/dev/null || true          # matar instancia manual/antigua si la hay
+systemctl --user restart hyprsunset.service       # recargar con el nuevo config
+
+echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00)."

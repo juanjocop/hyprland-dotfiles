@@ -21,17 +21,19 @@ está en la barra pero **plegado en el drawer `group/tools`** (módulo mal llama
 
 Mejoras a aplicar vía overlay (aprobadas por el usuario):
 
-1. **Botón visible en la barra** (no dentro del drawer): añadir un `custom/nightlight` propio
-   en el `modules-custom.json` de **nuestro theme** (`overlay/waybar/themes/ml4w-glass-juanjo/`;
-   icono claro tipo 󰌵/🌙, `on-click` = `~/.config/ml4w/scripts/ml4w-toggle-hyprsunset`,
-   `tooltip` = "Luz nocturna") y colocarlo directamente en `modules-right` del `config` de
-   nuestro theme, junto a las temperaturas.
-2. **Automatización por horario**: configurar perfiles con `time` en `hyprsunset.conf` para
-   activar/desactivar solo (p.ej. cálida 21:00–07:00). Ojo: `hyprsunset.conf` vive en
-   `~/.config/hypr/`, así que hay que **añadirlo al overlay** (`overlay/hypr/hyprsunset.conf`
-   + su ruta en `aplicar.sh`). Alternativa: un `systemd --user` timer o un script de
-   arranque que lance `hyprsunset -t <temp>` según la hora.
-   - Considerar temperatura más cálida (4000K/3500K) si 5000K se queda corta.
+1. **Botón visible en la barra** — **OMITIDO** (decisión del usuario, 2026-07): ya es
+   accesible por el toggle `SUPER+SHIFT+H` y el botón del drawer `group/tools`.
+2. **Automatización por horario** — ✅ **IMPLEMENTADO (2026-07)**. hyprsunset v0.4.0 soporta
+   perfiles por horario nativos; se versiona `overlay/hypr/hyprsunset.conf` con dos perfiles:
+   día 07:00 (`identity`, sin filtro) y noche 21:00 (`temperature = 4000`, `gamma = 1.0`).
+   El daemon corre persistente vía la **unit systemd empaquetada** `hyprsunset.service`
+   (no es archivo de ML4W → cero deriva); `aplicar.sh` despliega el config, hace
+   `enable`+`restart` del service; `check.sh` verifica que esté desplegado y activo;
+   `capturar-baseline.sh` guarda el default de ML4W en `baseline/hypr/hyprsunset.conf`.
+   - **Caveat**: el toggle `SUPER+SHIFT+H` (`ml4w-toggle-hyprsunset`) hace `pkill`/`hyprsunset &`;
+     al reactivar lanza una instancia manual (no systemd) que igualmente lee el schedule.
+     Re-sincronizar con `./aplicar.sh` o `systemctl --user restart hyprsunset.service`.
+     Hacer el toggle systemd-aware queda como mejora futura (requeriría versionar el script).
 
 ## B. Estética: bordes, colores, blur… (arquitectura ML4W verificada 2026-07)
 
