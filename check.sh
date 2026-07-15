@@ -51,5 +51,26 @@ if ! systemctl --user is-active --quiet hyprsunset.service; then
   echo "⚠  hyprsunset.service NO activo  → ./aplicar.sh (o systemctl --user restart hyprsunset.service)"; status=1
 fi
 
-[[ $status -eq 0 ]] && echo "✔  todo en sync (theme propio desplegado y activo; base sin cambios)."
+# 5) Fastfetch (logo rotativo). Aquí SÍ sobrescribimos un fichero de ML4W (config.jsonc), no
+#    una carpeta aparte → comprobación de 3 estados. Correr ANTES de aplicar.sh.
+ff_over="$ROOT/overlay/fastfetch/config.jsonc"
+ff_base="$ROOT/baseline/fastfetch/config.jsonc"
+ff_live="$LIVE/fastfetch/config.jsonc"
+if [[ ! -f "$ff_live" ]]; then
+  echo "⤴  NO desplegado: fastfetch/config.jsonc  → ./aplicar.sh"; status=1
+elif diff -q "$ff_over" "$ff_live" >/dev/null; then
+  :  # live == overlay → desplegado, OK
+elif [[ -f "$ff_base" ]] && diff -q "$ff_base" "$ff_live" >/dev/null; then
+  echo "⤴  fastfetch/config.jsonc no desplegado (vivo = base ML4W)  → ./aplicar.sh"; status=1
+else
+  echo "⚠  ML4W cambió fastfetch/config.jsonc  → revisar; re-incorporar la línea del glob a overlay/ + refrescar baseline (./capturar-baseline.sh)"; status=1
+fi
+
+# Carpeta de logos: debe existir y tener ≥1 PNG, o el glob no casa y no habría imagen.
+logos_dir="$LIVE/ml4w-juanjo/fastfetch-logos"
+if ! compgen -G "$logos_dir/*.png" >/dev/null; then
+  echo "⚠  sin PNG en $logos_dir  → ./aplicar.sh (el logo aleatorio de fastfetch quedaría vacío)"; status=1
+fi
+
+[[ $status -eq 0 ]] && echo "✔  todo en sync (theme propio desplegado y activo; base sin cambios; fastfetch rotativo)."
 exit $status

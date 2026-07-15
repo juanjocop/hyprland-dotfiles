@@ -30,4 +30,12 @@ systemctl --user enable hyprsunset.service >/dev/null 2>&1 || true
 pkill -x hyprsunset 2>/dev/null || true          # matar instancia manual/antigua si la hay
 systemctl --user restart hyprsunset.service       # recargar con el nuevo config
 
-echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00)."
+# 6. Fastfetch: logo rotativo. Desplegar nuestro config (fichero de ML4W → symlink al árbol,
+#    se re-aplica tras cada update) y sincronizar las imágenes a un namespace propio fuera de
+#    ML4W (~/.config/ml4w-juanjo/), que el updater nunca poda. fastfetch elige un PNG al azar
+#    en cada arranque gracias al glob de logo.source.
+cp -f "$ROOT/overlay/fastfetch/config.jsonc" "$DEST/fastfetch/config.jsonc"
+mkdir -p "$DEST/ml4w-juanjo/fastfetch-logos"
+rsync -a --delete "$ROOT/overlay/fastfetch/logos/" "$DEST/ml4w-juanjo/fastfetch-logos/"
+
+echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00; fastfetch con logo aleatorio)."

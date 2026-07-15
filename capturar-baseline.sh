@@ -11,6 +11,7 @@ BASE=(
   waybar/themes/ml4w-glass/style.css
   waybar/themes/ml4w-glass/default/style.css
   hypr/hyprsunset.conf
+  fastfetch/config.jsonc
 )
 
 for f in "${BASE[@]}"; do
