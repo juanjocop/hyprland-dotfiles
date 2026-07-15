@@ -4,7 +4,9 @@
     "logo": {
         "source": "~/.config/ml4w-juanjo/fastfetch-logos/*.png", // Glob: fastfetch elige una imagen al azar en cada arranque
         "type": "auto",                    // 'auto' detects the best protocol for your terminal
-        "width": 12,                       // Adjust width (in characters)
+        "width": 18,                       // ancho en caracteres (imágenes cuadradas 512x512)
+        "height": 9,                       // alto en líneas; ~2:1 char ratio → cuadrado real
+        "preserveAspectRatio": true,       // no deformar: encaja dentro de width x height
         "padding": {
             "top": 1,
             "right": 4,
