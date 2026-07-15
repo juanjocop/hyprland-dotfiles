@@ -38,4 +38,10 @@ cp -f "$ROOT/overlay/fastfetch/config.jsonc" "$DEST/fastfetch/config.jsonc"
 mkdir -p "$DEST/ml4w-juanjo/fastfetch-logos"
 rsync -a --delete "$ROOT/overlay/fastfetch/logos/" "$DEST/ml4w-juanjo/fastfetch-logos/"
 
-echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00; fastfetch con logo aleatorio)."
+# 7. Variante(s) de decoración propia(s). Fichero(s) nuevo(s) que ML4W no trae → se re-siembran
+#    tras cada update. Aparecen solos en Appearance por su cabecera `-- name:`. El usuario las
+#    selecciona desde la GUI (no forzamos conf/decoration.lua para no pelear con el picker).
+mkdir -p "$DEST/hypr/conf/decorations"
+cp -f "$ROOT"/overlay/hypr/conf/decorations/*.lua "$DEST/hypr/conf/decorations/"
+
+echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00; fastfetch con logo aleatorio; variante decoración 'Juanjo' disponible en Appearance)."
