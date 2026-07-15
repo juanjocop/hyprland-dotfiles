@@ -12,8 +12,8 @@ THEME="ml4w-glass-juanjo"
 rsync -a --delete "$ROOT/overlay/waybar/themes/$THEME/" \
                   "$DEST/waybar/themes/$THEME/"
 
-# 2. Asegurar permiso de ejecución del script de GPU en destino.
-chmod +x "$DEST/waybar/themes/$THEME/scripts/gputemp.sh"
+# 2. Asegurar permiso de ejecución de nuestros scripts del theme en destino.
+chmod +x "$DEST/waybar/themes/$THEME/scripts/"*.sh
 
 # 3. Fijar nuestro theme como activo (formato /CARPETA;/CARPETA/VARIACIÓN).
 echo "/$THEME;/$THEME/default" > "$DEST/ml4w/settings/waybar-theme.sh"

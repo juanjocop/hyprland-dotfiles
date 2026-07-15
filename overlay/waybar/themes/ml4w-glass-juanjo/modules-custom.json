@@ -20,5 +20,17 @@
         "tooltip": true,
         "tooltip-format": "GPU NVIDIA GTX 1060 Mobile",
         "on-click": "~/.config/ml4w/settings/system-monitor.sh"
+    },
+    // Fondo de vídeo (mpvpaper) — botón toggle ON/OFF. No arranca con el sistema.
+    // Al pulsar alterna mpvpaper y se autorefresca por señal (SIGRTMIN+8). Config del
+    // vídeo/rotación en el propio script livewallpaper.sh.
+    "custom/livewallpaper": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh status",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh toggle"
     }
 }

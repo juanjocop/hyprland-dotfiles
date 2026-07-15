@@ -39,6 +39,7 @@
         "group/hardware",
         "group/tools",
         "tray",
+        "custom/livewallpaper",
         "custom/notification",
         "custom/exit",
         "custom/ml4w-welcome"
