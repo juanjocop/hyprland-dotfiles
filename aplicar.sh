@@ -50,13 +50,19 @@ rsync -a --delete "$ROOT/overlay/fastfetch/logos/" "$DEST/ml4w-juanjo/fastfetch-
 mkdir -p "$DEST/hypr/conf/decorations"
 cp -f "$ROOT"/overlay/hypr/conf/decorations/*.lua "$DEST/hypr/conf/decorations/"
 
-# 8. Visualizador de audio (cava), a un SUPER+SHIFT+C. Tres piezas:
-#    - config de cava → ~/.config/cava/ (namespace propio, fuera de ML4W → cero deriva).
-#    - script del toggle → ~/.config/ml4w-juanjo/scripts/ (namespace propio, ídem).
+# 8. Visualizador de audio (cava), en dos modos excluyentes: ventana (SUPER+SHIFT+C) y fondo
+#    (SUPER+ALT+C). Piezas:
+#    - config de cava del tile → ~/.config/cava/ (namespace propio, fuera de ML4W → cero deriva).
+#    - config raw + widget Quickshell del fondo → ~/.config/ml4w-juanjo/ (namespace propio, ídem).
+#    - script del toggle (ambos modos) → ~/.config/ml4w-juanjo/scripts/ (ídem).
 #    - custom.lua → hook oficial de ML4W (lo carga el último). Este SÍ cae dentro del árbol
 #      de ML4W porque ~/.config/hypr es symlink → check.sh lo vigila por si un update lo poda.
-mkdir -p "$DEST/cava" "$DEST/ml4w-juanjo/scripts"
+mkdir -p "$DEST/cava" "$DEST/ml4w-juanjo/scripts" "$DEST/ml4w-juanjo/cava-bg" \
+         "$DEST/ml4w-juanjo/quickshell/cavabg"
 cp -f "$ROOT/overlay/cava/config" "$DEST/cava/config"
+cp -f "$ROOT/overlay/ml4w-juanjo/cava-bg/cava-raw.conf" "$DEST/ml4w-juanjo/cava-bg/cava-raw.conf"
+rsync -a --delete "$ROOT/overlay/ml4w-juanjo/quickshell/cavabg/" \
+                  "$DEST/ml4w-juanjo/quickshell/cavabg/"
 cp -f "$ROOT/overlay/ml4w-juanjo/scripts/cava-toggle.sh" "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
 chmod +x "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
 cp -f "$ROOT/overlay/hypr/custom.lua" "$DEST/hypr/custom.lua"

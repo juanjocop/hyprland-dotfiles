@@ -21,6 +21,8 @@ OURS=(
   waybar/themes/ml4w-glass-juanjo/default/config.sh
   hypr/hyprsunset.conf
   cava/config
+  ml4w-juanjo/cava-bg/cava-raw.conf
+  ml4w-juanjo/quickshell/cavabg/shell.qml
   ml4w-juanjo/scripts/cava-toggle.sh
   hypr/custom.lua
 )

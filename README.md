@@ -21,7 +21,7 @@ nuestro trabajo con un comando en vez de perderlo.
 | **Waybar: botón fondo de vídeo** | Enciende/apaga un fondo de vídeo (mpvpaper) desde un botón de la barra | `scripts/livewallpaper.sh` |
 | **Luz nocturna (hyprsunset)** | Filtro de luz azul automático por horario **21:00 → 07:00** (4000 K) | `overlay/hypr/hyprsunset.conf` + systemd |
 | **Fastfetch: logo rotativo** | Muestra una imagen distinta al azar en cada arranque de terminal | `overlay/fastfetch/` |
-| **Visualizador de audio (cava)** | Barras que se mueven al ritmo, como ventana tilada más. **SUPER+SHIFT+C** | `overlay/cava/` + `overlay/hypr/custom.lua` |
+| **Visualizador de audio (cava)** | Barras al ritmo, en dos modos excluyentes: ventana (**SUPER+SHIFT+C**) y fondo (**SUPER+ALT+C**) | `overlay/cava/` + `overlay/ml4w-juanjo/` + `overlay/hypr/custom.lua` |
 
 ---
 
@@ -81,40 +81,67 @@ Notas:
 
 ## Visualizador de audio (cava)
 
-**SUPER+SHIFT+C** abre/cierra las barras que se mueven al ritmo. Requiere el paquete `cava`
-(`sudo pacman -S cava`); `aplicar.sh` no lo instala porque necesita sudo, pero `check.sh` avisa
-si falta.
+Dos modos, **excluyentes** (encender uno apaga el otro — no tiene sentido tener dos visualizadores
+pintando lo mismo):
 
-**Es una ventana normal**: nace **tilada en el workspace en el que estés** y se coloca con las
-demás. Se mueve, redimensiona y manda a otro workspace con los atajos normales de Hyprland.
+| Atajo | Modo | Qué es |
+|---|---|---|
+| **SUPER+SHIFT+C** | **Ventana** | cava en una kitty, **tilada en el workspace actual**. Se mueve/redimensiona como cualquier ventana. |
+| **SUPER+ALT+C** | **Fondo** | Franja de barras de 250px abajo, **sobre el vídeo de mpvpaper y debajo de las ventanas**. Widget Quickshell propio. |
+
+Requiere el paquete `cava` (`sudo pacman -S cava`); `aplicar.sh` no lo instala porque necesita sudo,
+pero `check.sh` avisa si falta. Quickshell ya viene con ML4W (repos oficiales de Arch).
 
 **Visualiza cualquier audio del sistema.** cava lee del monitor de PipeWire, no de un reproductor:
 da igual que suene Zen, VLC, un juego o una web. No hay nada que configurar por reproductor.
 
-**No toca la GPU dedicada** (verificado 2026-07 comparando `nvidia-smi` con y sin cava): cava dibuja
-texto con ncurses = CPU pura, y kitty renderiza en la GPU del compositor, que es la Intel. Nada va
-a la NVIDIA sin pedirlo con las variables de PRIME offload.
+**Nada de esto toca la GPU dedicada** (verificado 2026-07 comparando la tabla de procesos de
+`nvidia-smi` con y sin cava: idéntica, 0% de uso). El modo ventana es CPU pura (ncurses); ambos
+renderizan en la GPU del compositor, que es la Intel. Nada va a la NVIDIA sin pedirlo con las
+variables de PRIME offload.
 
-Cómo está montado:
+### Cómo está montado
 
-- `overlay/cava/config` → `~/.config/cava/config`. Gradiente de 4 colores, `background = default`
-  para heredar la transparencia de kitty (look glass).
-- `overlay/hypr/custom.lua` → el **hook oficial** de ML4W (lo carga el último). Solo define el bind:
-  **no hay window_rule**, porque sin regla Hyprland ya la tila donde queremos.
-- `overlay/ml4w-juanjo/scripts/cava-toggle.sh` → el toggle.
+- `overlay/cava/config` → `~/.config/cava/config` — config del **modo ventana** (salida ncurses,
+  gradiente fijo, `background = default` para heredar la transparencia de kitty).
+- `overlay/ml4w-juanjo/cava-bg/cava-raw.conf` → config del **modo fondo**: salida `raw` (imprime
+  `"12;20;…;"` por stdout en vez de dibujar). `bars` **debe coincidir** con `barCount` del QML.
+- `overlay/ml4w-juanjo/quickshell/cavabg/shell.qml` → el widget del fondo.
+- `overlay/ml4w-juanjo/scripts/cava-toggle.sh` → **un solo** script con argumento (`tile` | `bg`),
+  para que la lógica de exclusión mutua viva en un único sitio.
+- `overlay/hypr/custom.lua` → el **hook oficial** de ML4W (lo carga el último): los dos binds.
 
-**El toggle mata cava al cerrar** en vez de esconderlo: en un portátil no tiene sentido gastar CPU
-en barras que no se ven. Por eso el estado se consulta con `pgrep cava`, y cerrar = `pkill cava`
-(kitty se cierra sola al morir el proceso que lanzó con `-e`).
+**Los cierres matan cava** en vez de esconderlo: en un portátil no tiene sentido gastar CPU en
+barras que no se ven. Con ambos modos apagados, `pgrep cava` no devuelve nada.
 
-> **Descartado: el workspace especial.** La primera versión metía cava en un `special:cava` con
-> toggle de scratchpad. Tapaba la pantalla entera, porque una ventana sola en un workspace propio
-> ocupa todo el espacio — y flotarla la hacía aún más grande (1920x1080). Se cambió a ventana tilada
-> normal, que además dejó el montaje más simple (sin regla y sin `toggle_special`).
+> ⚠️ **Nunca usar `pgrep -x cava` / `pkill -x cava` en el toggle.** Los dos modos lanzan un proceso
+> `cava`, así que razonar sobre "cualquier cava" mata el del otro modo. Cada modo apunta solo a **su**
+> proceso con `pgrep -f <patrón>` (`kitty --class cava-visualizer` / `qs -p …/cavabg`).
 
-Para cambiar los colores, edita el gradiente en `overlay/cava/config` y `./aplicar.sh`. Atarlo a la
-paleta del wallpaper (matugen) está en el roadmap: quedaría mejor pero obliga a tocar un fichero de
-ML4W → deriva.
+### El modo fondo, por dentro
+
+- **Convive con el vídeo** porque usa `WlrLayer.Bottom` → **nivel 1**, por encima de `mpvpaper`
+  (nivel 0) y por debajo de `waybar` (nivel 2) y de las ventanas. `exclusionMode: Ignore` para no
+  reservar espacio.
+- **Los colores salen de matugen**: el QML lee `~/.config/ml4w/colors/colors.json` con un `FileView`
+  que vigila cambios → al cambiar de wallpaper, matugen regenera la paleta y **las barras se
+  re-colorean solas**, sin reiniciar nada. Así pegan con waybar y los bordes.
+- Para retocar el aspecto: `stripHeight`, `barCount`, `gap`, `smoothMs` y `peakFall` están juntos
+  arriba del `shell.qml`. Si tocas `barCount`, toca también `bars` en `cava-raw.conf`.
+
+> **Nota de depuración**: `qs` lanzado en segundo plano desde un shell no interactivo puede morir al
+> salir el padre. Lanzado por Hyprland (que es lo que hace la keybind) sobrevive sin problema. Si al
+> probar a mano parece que no arranca, pruébalo con
+> `hyprctl dispatch 'hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/cava-toggle.sh bg")'`.
+
+### Decisiones descartadas (para no rehacerlas)
+
+- **El workspace especial**: la primera versión del modo ventana usaba un `special:cava`. Tapaba la
+  pantalla entera — una ventana sola en un workspace propio ocupa todo — y flotarla la hacía aún más
+  grande. Se cambió a ventana tilada normal.
+- **cava-bg** (AUR): se descartó por desconfianza en un proyecto de 3 meses con 2 votos, y porque el
+  widget propio da lo mismo con Quickshell de repos oficiales. Ver `03-roadmap.md` §A-ter.
+- **Colores muestreados del vídeo**: se descartó a favor de matugen. Ver el roadmap.
 
 ---
 
@@ -124,9 +151,11 @@ ML4W → deriva.
 overlay/                     ← fuente de verdad: solo lo que personalizamos
   waybar/themes/ml4w-glass-juanjo/   theme propio (temps + botón fondo vídeo)
   hypr/hyprsunset.conf               horario de luz nocturna
-  hypr/custom.lua                    hook oficial de ML4W: bind de cava
-  cava/config                        config del visualizador (gradiente, fuente de audio)
-  ml4w-juanjo/scripts/cava-toggle.sh script del toggle SUPER+SHIFT+C
+  hypr/custom.lua                    hook oficial de ML4W: los dos binds de cava
+  cava/config                        cava del modo ventana (salida ncurses)
+  ml4w-juanjo/cava-bg/cava-raw.conf  cava del modo fondo (salida raw para el QML)
+  ml4w-juanjo/quickshell/cavabg/     widget del fondo (franja + colores de matugen)
+  ml4w-juanjo/scripts/cava-toggle.sh toggle de ambos modos (tile|bg) + exclusión mutua
   fastfetch/config.jsonc             config con el glob del logo
   fastfetch/logos/*.png              conjunto de logos para la rotación
 baseline/                    ← copia "virgen" de la base de ML4W (para detectar deriva)

@@ -37,28 +37,48 @@ Mejoras a aplicar vía overlay (aprobadas por el usuario):
 
 ## A-ter. Música y visualizador — cava YA existe, ampliaciones posibles
 
-Estado: **cava implementado (2026-07)**, ventana **tilada normal** a un **SUPER+SHIFT+C**: nace en
-el workspace activo y se coloca con las demás. Ver README y `00-contexto-y-hardware.md` §Audio.
-Lee del monitor de PipeWire → visualiza cualquier audio, independiente del reproductor.
-Verificado que **no toca la dGPU** (ncurses = CPU; kitty renderiza en la Intel del compositor).
+Estado: **cava implementado (2026-07) en sus dos modos**, ventana (SUPER+SHIFT+C) y fondo
+(SUPER+ALT+C), excluyentes entre sí. El modo fondo es un **widget Quickshell propio** que convive
+con el vídeo de mpvpaper y se colorea con matugen. Ver README y `00-contexto-y-hardware.md` §Audio.
+Verificado que **no toca la dGPU**.
 
-Ideas por orden de interés:
+### Descartado: cava-bg (2026-07)
 
-1. **cava-bg: visualizador en el FONDO del escritorio** ([leriart/cava-bg](https://github.com/leriart/cava-bg),
-   Rust + wgpu + layer-shell) — **SIGUIENTE PASO, pedido por el usuario (2026-07)**. Detecta el
-   wallpaper y le extrae los colores; **soporta mpvpaper**, que es justo lo que ya corre aquí.
-   Resuelve lo que la ventana tilada no puede: barras *detrás* de todo, permanentes, sin tapar.
-   Está en AUR (paru disponible). ⚠️ **Aviso Optimus**: a diferencia de cava en ncurses, esto **sí**
-   renderiza en GPU (wgpu), y sería otra capa constante encima del vídeo en bucle de mpvpaper.
-   **Medir consumo y batería antes de casarse con ello** — y ojo, la dGPU ya está despierta a
-   3.47 W por culpa de Steam (`steamwebhelper`), así que medir con Steam cerrado para no confundir
-   las causas.
-2. **Gradiente atado al wallpaper (matugen)** — hoy los 4 colores del gradiente son fijos. ML4W
-   genera su paleta con matugen desde el fondo (ver §B). Atar cava a esa paleta quedaría redondo,
-   pero obliga a añadir una plantilla en `~/.config/matugen/config.toml` — **fichero de ML4W →
-   deriva** — y a recargar cava al cambiar de fondo. Requiere `check.sh` de 3 estados (como
-   fastfetch). Se descartó por "hacerlo sencillo primero". (cava-bg trae su propia extracción de
-   color del wallpaper, así que si se adopta, esto puede volverse innecesario.)
+[leriart/cava-bg](https://github.com/leriart/cava-bg) hacía justo esto, pero se descartó:
+
+- **Confianza**: proyecto de abril de 2026, 58★, **2 votos en AUR**. El PKGBUILD se auditó y está
+  limpio (el sha256 del tarball **coincide** con el de upstream → compila el código real, sin
+  parches; sin hooks `.install`, sin red, sin telemetría remota — su `telemetry` es logging local).
+  Nada sospechoso, pero es código joven con pocos ojos encima, y **el widget propio da lo mismo con
+  Quickshell de repos oficiales**. Coste ~150 líneas de QML frente a confiar en un desconocido.
+- **Sus efectos vistosos no aplican aquí**: `parallax` y `x-ray` no son efectos de barras sino de
+  **composición de imágenes** (confirmado: `layer_system.rs` y `parallax_system.rs` cargan
+  texturas). X-Ray usa las barras de máscara para revelar una imagen oculta; parallax desplaza
+  capas de imagen con ratón/audio para fingir 3D. Ambos existen para dar vida a wallpapers
+  **estáticos** — aquí el fondo ya es vídeo. Además su propia doc marca el sistema de capas como
+  *"not yet wired to the renderer"* y `parallax.mode` como *"not currently read by the renderer"*.
+- **Alternativas revisadas y también descartadas**: **GLava** (el clásico de los vídeos de rices) es
+  **solo X11**; **hyprglaze** es igual de nuevo (abril 2026); **shaderbg/glbg/neowall** son shaders
+  sin audio-reactividad de serie. **No existe una opción Wayland madura** para esto: todo el
+  ecosistema es de 2026. Por eso el widget propio.
+- **Vía mpv descartada también**: `mpvpaper -o "--lavfi-complex=…"` con los filtros de ffmpeg
+  (`showcqt`, `showspectrum`…) funciona y es cero dependencias — verificado que
+  `mpv av://pulse:<monitor>` lee el audio del sistema. Pero mpvpaper reproduce **una cosa por
+  salida**: sería el visualizador **en lugar** del vídeo, no encima. Queda anotado por si algún día
+  se prefiere eso.
+
+### Mejoras posibles sobre el widget
+
+1. **Modo idle** — hoy cava corre a 60 fps mientras el fondo esté encendido, aunque no suene nada.
+   El toggle lo compensa (coste cero apagado). Mejora: pausar el repintado cuando todas las barras
+   estén a 0 durante N segundos.
+2. **Más formas** — el widget está en `overlay/ml4w-juanjo/quickshell/cavabg/shell.qml` con los
+   ajustes (`stripHeight`, `barCount`, `gap`, `smoothMs`, `peakFall`) juntos arriba. Variantes
+   posibles: espejo desde el centro, altura completa, barras por monitor.
+3. **De dónde saca matugen la paleta** — ver el aviso en §B: el wallpaper que la genera
+   (`awww-daemon`) está **tapado por el vídeo de mpvpaper**. La paleta sale de una foto que no se
+   ve. No es un problema del widget (al contrario: así pega con waybar), pero es una rareza del
+   setup que quizá convenga replantear.
 3. **Módulo de música en waybar (`mpris`)** — waybar depende de `playerctl` y `libmpdclient`, así
    que el módulo `mpris` **sí está disponible**. ⚠️ Filtrar por **`firefox`**, no por `zen` (ver
    `00-contexto-y-hardware.md` §MPRIS). La sidebar de Quickshell de ML4W ya muestra MPRIS, así que

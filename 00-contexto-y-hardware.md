@@ -35,6 +35,22 @@
   Devuelve un entero (ej. `53`).
 - Uso/VRAM (para el roadmap): `--query-gpu=utilization.gpu,memory.used,memory.total`.
 
+### La dGPU idlea a ~3.47 W y la mantiene despierta SDDM (verificado 2026-07)
+
+Dato para no sacar conclusiones falsas al medir consumo de cualquier cosa:
+
+- La NVIDIA aparece siempre `runtime_status: active` con `0 %` de uso y **~3.47 W**, incluso sin
+  nada gráfico corriendo. **Ese es el suelo**, no lo causa lo que estés midiendo.
+- Quien la tiene agarrada es **el Xorg de SDDM** (pid bajo, padre `/usr/bin/sddm`,
+  `-auth /run/sddm/xauth_…`, `vt2`): el servidor X del gestor de login, que sigue vivo tras entrar
+  a la sesión Wayland.
+- ⚠️ **Steam NO es la causa**, aunque aparezca en la tabla de procesos de `nvidia-smi`
+  (`steamwebhelper`). Medido: **3.47 W con Steam abierto y 3.47 W con Steam cerrado**. En una
+  sesión anterior se afirmó lo contrario; era incorrecto.
+- Consecuencia: al medir si algo usa la dGPU, mirar la **tabla de procesos** de `nvidia-smi` (¿sale
+  tu proceso?) y el **delta** de potencia, no el valor absoluto.
+- Comprobar el estado: `cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status`.
+
 ## Audio y MPRIS (verificado 2026-07)
 
 Contexto para cualquier cosa de música/reproductores. **Nada de esto afecta a cava**, que lee

@@ -1,28 +1,58 @@
 #!/usr/bin/env bash
-# cava-toggle.sh — abre/cierra el visualizador cava. Lo llama SUPER+SHIFT+C
-# (ver overlay/hypr/custom.lua). Se despliega a ~/.config/ml4w-juanjo/scripts/ (namespace
-# propio, fuera del árbol de ML4W → cero deriva).
+# cava-toggle.sh — enciende/apaga el visualizador de audio, en uno de sus dos modos:
 #
-# El visualizador es una ventana NORMAL: nace tilada en el workspace actual y se coloca con
-# las demás (mover, redimensionar, mandar a otro workspace: atajos normales de Hyprland).
-# No hay workspace especial ni window_rule: sin regla, Hyprland ya la tila donde toca.
+#   cava-toggle.sh tile   → SUPER+SHIFT+C: cava en una ventana kitty, tilada en el workspace actual.
+#   cava-toggle.sh bg     → SUPER+ALT+C:   franja de barras en el fondo (widget Quickshell),
+#                                          sobre el vídeo de mpvpaper y bajo las ventanas.
 #
-# Cerrar = matar cava, NO cerrar la ventana: kitty se cierra sola cuando muere el proceso que
-# lanzó con -e. Se evita así depender del targeting de `hl.dsp.window.close`, cuya forma de
-# apuntar a una ventana concreta no está documentada en la API Lua de Hyprland 0.55 y que, si
-# ignorase el argumento, cerraría la ventana ACTIVA (la del usuario).
+# Los dos modos son EXCLUYENTES: encender uno apaga el otro. No tiene sentido tener dos
+# visualizadores pintando la misma información, y así nunca hay dos cavas compitiendo.
+# Un único script en vez de dos para que la lógica de exclusión viva en un solo sitio.
 #
-# Consultar el estado con `pgrep cava` (= "¿está consumiendo?") es justo la condición que
-# importa en un portátil, y además se autocura si queda un cava huérfano sin ventana.
+# Se despliega a ~/.config/ml4w-juanjo/scripts/ (namespace propio, fuera del árbol de ML4W).
 #
-# Nota: `pkill -x cava` mata cualquier cava, incluido uno lanzado a mano en otra terminal.
-# Es lo deseable: el objetivo es que no quede nada consumiendo.
+# IMPORTANTE — por qué se apunta con `pgrep -f <patrón>` y no con `pgrep -x cava`:
+# ambos modos lanzan un proceso `cava`, así que razonar sobre "cualquier cava" mataría el del
+# otro modo (y también el de un cava lanzado a mano, o el de un cava-bg si algún día se instala).
+# Cada modo apunta solo a SU proceso. `pgrep -x cava` no debe volver a aparecer aquí.
+#
+# Cerrar el tile = matar su kitty; cava muere con ella (es su proceso hijo vía `-e`).
 set -euo pipefail
 
-CLASS="cava-visualizer"
+MODE="${1:-tile}"
 
-if pgrep -x cava >/dev/null; then
-    pkill -x cava
-else
-    kitty --class "$CLASS" -e cava >/dev/null 2>&1 &
-fi
+TILE_PAT="kitty --class cava-visualizer"
+BG_PAT="qs -p .*/ml4w-juanjo/quickshell/cavabg"
+BG_DIR="$HOME/.config/ml4w-juanjo/quickshell/cavabg"
+
+tile_running() { pgrep -f "$TILE_PAT" >/dev/null; }
+bg_running() { pgrep -f "$BG_PAT" >/dev/null; }
+
+stop_tile() { pkill -f "$TILE_PAT" 2>/dev/null || true; }
+stop_bg() { pkill -f "$BG_PAT" 2>/dev/null || true; }
+
+start_tile() { kitty --class cava-visualizer -e cava >/dev/null 2>&1 & }
+start_bg() { qs -p "$BG_DIR" >/dev/null 2>&1 & }
+
+case "$MODE" in
+tile)
+    if tile_running; then
+        stop_tile
+    else
+        stop_bg
+        start_tile
+    fi
+    ;;
+bg)
+    if bg_running; then
+        stop_bg
+    else
+        stop_tile
+        start_bg
+    fi
+    ;;
+*)
+    echo "uso: $(basename "$0") [tile|bg]" >&2
+    exit 2
+    ;;
+esac

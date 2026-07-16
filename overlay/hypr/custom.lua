@@ -7,18 +7,28 @@
 -- OJO: ~/.config/hypr SÍ es symlink al árbol de ML4W, así que este fichero aterriza DENTRO del
 -- árbol gestionado. Un update podría podarlo → check.sh lo vigila.
 
--- Visualizador de audio (cava). Es una ventana NORMAL: nace tilada en el workspace en el que
--- estés y se coloca con las demás. Por eso aquí no hay window_rule — sin regla, Hyprland ya
--- hace lo que queremos.
+-- Visualizador de audio, en dos modos excluyentes (encender uno apaga el otro):
 --
--- (Antes vivía en un workspace especial `special:cava`, pero tapaba la pantalla entera: una
--- ventana sola en un workspace propio ocupa todo. Se descartó a favor del tile normal.)
+--   SUPER+SHIFT+C → tile: cava en una ventana kitty, tilada en el workspace actual. Es una
+--                   ventana normal, por eso no hay window_rule: sin regla Hyprland ya la coloca.
+--   SUPER+ALT+C   → fondo: franja de barras (widget Quickshell) sobre el vídeo de mpvpaper y
+--                   debajo de las ventanas, con los colores de matugen.
 --
--- La ventana se lanza con `--class cava-visualizer` (ver cava-toggle.sh). Esa clase propia no
--- hace falta hoy, pero distingue el visualizador de una kitty cualquiera y deja la puerta
--- abierta a añadirle reglas aquí sin tocar el script.
+-- Ambas teclas verificadas libres: de las SUPER+SHIFT, ML4W ocupa A B G H M Q R S T W (la H es
+-- hyprsunset); de las SUPER+ALT, ocupa A F G S T W y las flechas.
+--
+-- La ventana del tile se lanza con `--class cava-visualizer`. Esa clase propia no hace falta
+-- hoy, pero distingue el visualizador de una kitty cualquiera y deja añadirle reglas aquí sin
+-- tocar el script.
+
 hl.bind(
     "SUPER + SHIFT + C",
-    hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/cava-toggle.sh"),
-    { description = "Toggle visualizador cava" }
+    hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/cava-toggle.sh tile"),
+    { description = "Toggle visualizador cava (ventana)" }
+)
+
+hl.bind(
+    "SUPER + ALT + C",
+    hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/cava-toggle.sh bg"),
+    { description = "Toggle visualizador cava (fondo)" }
 )
