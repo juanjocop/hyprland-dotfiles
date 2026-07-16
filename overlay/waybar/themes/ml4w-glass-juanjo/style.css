@@ -229,6 +229,25 @@ window#waybar.empty #window {
 }
 
 /* -----------------------------------------------------
+ * Luz nocturna (botón hyprsunset)
+ * ----------------------------------------------------- */
+
+#custom-nightlight {
+    font-size: 15px;
+    padding: 0px 6px;
+}
+
+/* Encendida: acento del theme. Apagada: atenuada. */
+#custom-nightlight.active {
+    color: @primary;
+}
+
+#custom-nightlight.inactive {
+    color: @on_surface;
+    opacity: 0.45;
+}
+
+/* -----------------------------------------------------
  * Custom Notification
  * ----------------------------------------------------- */
 

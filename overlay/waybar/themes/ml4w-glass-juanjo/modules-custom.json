@@ -32,5 +32,19 @@
         "format": "{}",
         "tooltip": true,
         "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh toggle"
+    },
+    // Luz nocturna (hyprsunset) — override manual sobre el horario de hyprsunset.conf.
+    // Clic: alterna cálido/neutro. Clic derecho: devuelve el mando al horario.
+    // interval (no "once"): el horario cambia solo a las 07:00/21:00 sin avisar a waybar,
+    // así que hay que sondear; la señal solo cubre nuestras propias pulsaciones.
+    "custom/nightlight": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/nightlight.sh status",
+        "return-type": "json",
+        "interval": 30,
+        "signal": 9,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/nightlight.sh toggle",
+        "on-click-right": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/nightlight.sh schedule"
     }
 }

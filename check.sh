@@ -15,6 +15,8 @@ OURS=(
   waybar/themes/ml4w-glass-juanjo/modules-custom.json
   waybar/themes/ml4w-glass-juanjo/style.css
   waybar/themes/ml4w-glass-juanjo/scripts/gputemp.sh
+  waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh
+  waybar/themes/ml4w-glass-juanjo/scripts/nightlight.sh
   waybar/themes/ml4w-glass-juanjo/default/style.css
   waybar/themes/ml4w-glass-juanjo/default/config.sh
   hypr/hyprsunset.conf
@@ -64,6 +66,21 @@ elif [[ -f "$ff_base" ]] && diff -q "$ff_base" "$ff_live" >/dev/null; then
   echo "⤴  fastfetch/config.jsonc no desplegado (vivo = base ML4W)  → ./aplicar.sh"; status=1
 else
   echo "⚠  ML4W cambió fastfetch/config.jsonc  → revisar; re-incorporar la línea del glob a overlay/ + refrescar baseline (./capturar-baseline.sh)"; status=1
+fi
+
+# 6) Toggle de luz nocturna. Otro fichero de ML4W que SÍ sobrescribimos (con un shim que
+#    delega en nightlight.sh) → comprobación de 3 estados, igual que fastfetch.
+nl_over="$ROOT/overlay/ml4w/scripts/ml4w-toggle-hyprsunset"
+nl_base="$ROOT/baseline/ml4w/scripts/ml4w-toggle-hyprsunset"
+nl_live="$LIVE/ml4w/scripts/ml4w-toggle-hyprsunset"
+if [[ ! -f "$nl_live" ]]; then
+  echo "⤴  NO desplegado: ml4w/scripts/ml4w-toggle-hyprsunset  → ./aplicar.sh"; status=1
+elif diff -q "$nl_over" "$nl_live" >/dev/null; then
+  :  # live == overlay → shim desplegado, OK
+elif [[ -f "$nl_base" ]] && diff -q "$nl_base" "$nl_live" >/dev/null; then
+  echo "⤴  ml4w-toggle-hyprsunset no desplegado (vivo = base ML4W: mata el daemon y el botón no calienta)  → ./aplicar.sh"; status=1
+else
+  echo "⚠  ML4W cambió ml4w-toggle-hyprsunset  → revisar; re-incorporar el shim a overlay/ + refrescar baseline (./capturar-baseline.sh)"; status=1
 fi
 
 # Carpeta de logos: debe existir y tener ≥1 PNG, o el glob no casa y no habría imagen.

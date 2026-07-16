@@ -30,6 +30,12 @@ systemctl --user enable hyprsunset.service >/dev/null 2>&1 || true
 pkill -x hyprsunset 2>/dev/null || true          # matar instancia manual/antigua si la hay
 systemctl --user restart hyprsunset.service       # recargar con el nuevo config
 
+# 5b. Sustituir el toggle de ML4W (fichero suyo → se repone en cada update) por un shim que
+#     delega en nuestro nightlight.sh. El original mataba el daemon con pkill, dejaba el
+#     service muerto y de día no calentaba nada. Cubre el botón del cajón "tools" y SUPER+SHIFT+H.
+cp -f "$ROOT/overlay/ml4w/scripts/ml4w-toggle-hyprsunset" "$DEST/ml4w/scripts/ml4w-toggle-hyprsunset"
+chmod +x "$DEST/ml4w/scripts/ml4w-toggle-hyprsunset"
+
 # 6. Fastfetch: logo rotativo. Desplegar nuestro config (fichero de ML4W → symlink al árbol,
 #    se re-aplica tras cada update) y sincronizar las imágenes a un namespace propio fuera de
 #    ML4W (~/.config/ml4w-juanjo/), que el updater nunca poda. fastfetch elige un PNG al azar
@@ -44,4 +50,4 @@ rsync -a --delete "$ROOT/overlay/fastfetch/logos/" "$DEST/ml4w-juanjo/fastfetch-
 mkdir -p "$DEST/hypr/conf/decorations"
 cp -f "$ROOT"/overlay/hypr/conf/decorations/*.lua "$DEST/hypr/conf/decorations/"
 
-echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00; fastfetch con logo aleatorio; variante decoración 'Juanjo' disponible en Appearance)."
+echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00 + botón manual; fastfetch con logo aleatorio; variante decoración 'Juanjo' disponible en Appearance)."

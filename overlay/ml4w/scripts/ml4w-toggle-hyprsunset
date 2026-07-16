@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# ml4w-toggle-hyprsunset — fichero DE ML4W que sobrescribimos (~/.config/ml4w es symlink a su
+# árbol). El updater lo repone → baseline/ + check.sh vigilan la deriva; aplicar.sh lo re-copia.
+#
+# El original hacía `pkill hyprsunset` / `hyprsunset &`: mataba hyprsunset.service (que es
+# Restart=on-failure, y el pkill sale con 0 → systemd no lo rearrancaba) y dejaba un daemon
+# huérfano. Además, con nuestro horario el perfil diurno es `identity`, así que relanzarlo de
+# día no calentaba la pantalla: el botón parecía no hacer nada.
+#
+# Delegamos en nuestro script, que hace override por IPC sin tocar el daemon. Cubre los dos
+# puntos de entrada de ML4W: el botón custom/hyprshade del cajón "tools" y SUPER+SHIFT+H.
+exec "$HOME/.config/waybar/themes/ml4w-glass-juanjo/scripts/nightlight.sh" toggle
