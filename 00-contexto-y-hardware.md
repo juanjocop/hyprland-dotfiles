@@ -35,6 +35,89 @@
   Devuelve un entero (ej. `53`).
 - Uso/VRAM (para el roadmap): `--query-gpu=utilization.gpu,memory.used,memory.total`.
 
+## Audio y MPRIS (verificado 2026-07)
+
+Contexto para cualquier cosa de música/reproductores. **Nada de esto afecta a cava**, que lee
+directamente del monitor de PipeWire y por eso visualiza *cualquier* audio del sistema sea cual sea
+el reproductor; es contexto para módulos de waybar/Quickshell futuros.
+
+### Fuente de audio (para cava y similares)
+
+- Monitor del sink: `alsa_output.pci-0000_00_1f.3.analog-stereo.monitor`.
+- cava con `source = auto` **autodetecta bien** (PoC 2026-07: picos de 86/100 con Zen sonando).
+  Solo hace falta fijar la fuente a mano si algún día falla la autodetección.
+- El monitor aparece `SUSPENDED` cuando no suena nada y pasa a `RUNNING` con audio. Es normal:
+  no confundirlo con un fallo.
+
+### El navegador se llama `firefox` en el bus MPRIS ⚠️
+
+- Navegador en uso: **Zen, instalado como Flatpak** (`app.zen_browser.zen`). Los procesos son
+  `/app/zen/zen`. Firefox nativo (paquete pacman) está instalado pero **no se usa**; **no se
+  desinstala de momento** (decisión del usuario, 2026-07).
+- **Zen se identifica en el bus MPRIS como `firefox.instance_<n>`**, NO como `zen`: es un fork de
+  Gecko y no rebrandeó el nombre del bus. Verificado con `playerctl -l`.
+  → **Cualquier config futura de waybar/Quickshell debe filtrar por `firefox`, no por `zen`.**
+- **Riesgo latente**: si algún día se arranca Firefox nativo a la vez que Zen, **colisionan en el
+  nombre del bus** y no habrá forma de distinguirlos desde una keybind de playerctl. `playerctld`
+  está disponible en el bus y mitiga (sigue "el último player activo"). Desinstalar Firefox
+  eliminaría el riesgo de raíz — pendiente, no ahora.
+- La **carátula sí funciona** pese al sandbox de Flatpak: el `mpris:artUrl` de Zen apunta a un
+  fichero real y legible desde el host
+  (`~/.var/app/app.zen_browser.zen/data/firefox-mpris/*.png`). El bug conocido de artUrl
+  incompleto en Flatpak no aplica aquí.
+- ML4W **ya trae un widget MPRIS** en la sidebar de Quickshell
+  (`.config/quickshell/SidebarApp/SidebarWindow.qml:508`, `import Quickshell.Services.Mpris`)
+  → lo que suene en Zen/VLC ya sale ahí con controles, sin configurar nada.
+
+## Hyprland 0.55: la config es Lua nativa (verificado 2026-07)
+
+Cosas que rompen la intuición heredada de la config clásica de Hyprland. **No redescubrirlas.**
+
+- **No hay `hyprland.conf`.** El entrypoint es `~/.config/hypr/hyprland.lua`, Lua puro con
+  `require()`. Hyprland 0.55.4.
+- **`hyprctl dispatch` evalúa su argumento como Lua**, envolviéndolo en `hl.dispatch(...)`. La
+  sintaxis de string clásica **ya NO funciona**:
+  ```bash
+  hyprctl dispatch closewindow class:foo          # ✘ error: ')' expected near 'class'
+  hyprctl dispatch 'hl.dsp.workspace.toggle_special("cava")'   # ✔
+  ```
+- **`hl.dsp.*` solo CONSTRUYE un descriptor, no ejecuta.** Por eso `hyprctl eval 'hl.dsp.window.close(…)'`
+  devuelve `ok` con cualquier argumento, incluso inventado: no valida ni dispara nada. **No sirve
+  para probar dispatchers.** Quien ejecuta es `hl.dispatch(descriptor)`.
+- **`hl.window_rule` SÍ valida los campos**, y ahí `hyprctl eval` es un banco de pruebas fiable:
+  ```bash
+  hyprctl eval 'hl.window_rule({ name="x", match={class="___fake___"}, workspace="special:cava" })'
+  # → ok            (workspace es campo válido)
+  hyprctl eval 'hl.window_rule({ name="x", match={class="___fake___"}, inventada=1 })'
+  # → error: hl.window_rule: unknown field 'inventada'
+  ```
+  Usar siempre una clase falsa que no case con nada al probar.
+- API real (introspección con `for k,v in pairs(hl.dsp.window)`, volcada a fichero desde Lua
+  porque `hyprctl eval` no imprime valores de retorno):
+  - `hl.dsp`: `cursor, dpms, event, exec_cmd, exec_raw, exit, focus, force_idle,
+    force_renderer_reload, global, group, layout, no_op, pass, send_key_state, send_shortcut,
+    submap, window, workspace`
+  - `hl.dsp.window`: `alter_zorder, bring_to_top, center, clear_tags, close, cycle_next,
+    deny_from_group, drag, float, fullscreen, fullscreen_state, kill, move, pin, pseudo, resize,
+    set_prop, signal, swap, tag, toggle_swallow`
+  - `hl.dsp.workspace`: `move, rename, swap_monitors, toggle_special`
+- **Hook oficial de personalización**: `~/.config/hypr/custom.lua`. `hyprland.lua:39-44` lo carga
+  con `require("custom")` **el último**, después de todos los `conf.*` → gana sobre cualquier bind
+  anterior. ML4W **no lo trae de serie**. ⚠️ Pero `~/.config/hypr` **sí** es symlink al árbol de
+  ML4W, así que el fichero cae DENTRO del árbol gestionado → lo vigila `check.sh`.
+- Sintaxis de bind (`conf/keybindings/default.lua:5`):
+  ```lua
+  hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd("~/ruta/script.sh"), { description = "..." })
+  ```
+- `modmask` en `hyprctl binds`: SUPER=64, SHIFT=1 → **SUPER+SHIFT = 65**.
+- Workspace especial que ya trae ML4W: **`magic`** (SUPER+S), sin ninguna app asignada.
+  Conviene dejarlo libre y crear los nuestros aparte.
+
+### Binds SUPER+SHIFT ocupadas por ML4W (para no pisar)
+
+`A B G H M Q R S T W` — la `H` es el toggle de hyprsunset. Libres a 2026-07: `C D E F I J K L N O
+P U V X Y Z` (usamos la **C** para cava).
+
 ## Rutas de ML4W (dónde vive todo)
 
 - Árbol real: `~/.mydotfiles/com.ml4w.dotfiles.stable/.config/...`

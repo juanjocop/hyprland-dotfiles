@@ -20,6 +20,9 @@ OURS=(
   waybar/themes/ml4w-glass-juanjo/default/style.css
   waybar/themes/ml4w-glass-juanjo/default/config.sh
   hypr/hyprsunset.conf
+  cava/config
+  ml4w-juanjo/scripts/cava-toggle.sh
+  hypr/custom.lua
 )
 for f in "${OURS[@]}"; do
   over="$ROOT/overlay/$f"; live="$LIVE/$f"
@@ -89,5 +92,11 @@ if ! compgen -G "$logos_dir/*.png" >/dev/null; then
   echo "⚠  sin PNG en $logos_dir  → ./aplicar.sh (el logo aleatorio de fastfetch quedaría vacío)"; status=1
 fi
 
-[[ $status -eq 0 ]] && echo "✔  todo en sync (theme propio desplegado y activo; base sin cambios; fastfetch rotativo)."
+# 7) cava (visualizador): binario externo, dependencia de SUPER+SHIFT+C. aplicar.sh no lo
+#    instala (requiere sudo) → aquí solo avisamos. Sin él el toggle abre un terminal que muere.
+if ! command -v cava >/dev/null; then
+  echo "⚠  cava NO instalado  → sudo pacman -S cava (SUPER+SHIFT+C no funcionará)"; status=1
+fi
+
+[[ $status -eq 0 ]] && echo "✔  todo en sync (theme propio desplegado y activo; base sin cambios; fastfetch rotativo; cava listo)."
 exit $status

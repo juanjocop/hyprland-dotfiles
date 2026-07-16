@@ -50,4 +50,15 @@ rsync -a --delete "$ROOT/overlay/fastfetch/logos/" "$DEST/ml4w-juanjo/fastfetch-
 mkdir -p "$DEST/hypr/conf/decorations"
 cp -f "$ROOT"/overlay/hypr/conf/decorations/*.lua "$DEST/hypr/conf/decorations/"
 
-echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00 + botón manual; fastfetch con logo aleatorio; variante decoración 'Juanjo' disponible en Appearance)."
+# 8. Visualizador de audio (cava), a un SUPER+SHIFT+C. Tres piezas:
+#    - config de cava → ~/.config/cava/ (namespace propio, fuera de ML4W → cero deriva).
+#    - script del toggle → ~/.config/ml4w-juanjo/scripts/ (namespace propio, ídem).
+#    - custom.lua → hook oficial de ML4W (lo carga el último). Este SÍ cae dentro del árbol
+#      de ML4W porque ~/.config/hypr es symlink → check.sh lo vigila por si un update lo poda.
+mkdir -p "$DEST/cava" "$DEST/ml4w-juanjo/scripts"
+cp -f "$ROOT/overlay/cava/config" "$DEST/cava/config"
+cp -f "$ROOT/overlay/ml4w-juanjo/scripts/cava-toggle.sh" "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
+chmod +x "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
+cp -f "$ROOT/overlay/hypr/custom.lua" "$DEST/hypr/custom.lua"
+
+echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00 + botón manual; fastfetch con logo aleatorio; variante decoración 'Juanjo' disponible en Appearance; cava en SUPER+SHIFT+C)."

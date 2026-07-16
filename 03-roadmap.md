@@ -35,6 +35,40 @@ Mejoras a aplicar vía overlay (aprobadas por el usuario):
      Re-sincronizar con `./aplicar.sh` o `systemctl --user restart hyprsunset.service`.
      Hacer el toggle systemd-aware queda como mejora futura (requeriría versionar el script).
 
+## A-ter. Música y visualizador — cava YA existe, ampliaciones posibles
+
+Estado: **cava implementado (2026-07)**, scratchpad en `special:cava` a un **SUPER+SHIFT+C**.
+Ver README y `00-contexto-y-hardware.md` §Audio. Lee del monitor de PipeWire → visualiza cualquier
+audio, independiente del reproductor.
+
+Ideas por orden de interés, todas **descartadas conscientemente** en la primera iteración:
+
+1. **Gradiente atado al wallpaper (matugen)** — hoy los 4 colores del gradiente son fijos. ML4W
+   genera su paleta con matugen desde el fondo (ver §B). Atar cava a esa paleta quedaría redondo,
+   pero obliga a añadir una plantilla en `~/.config/matugen/config.toml` — **fichero de ML4W →
+   deriva** — y a recargar cava al cambiar de fondo. Requiere `check.sh` de 3 estados (como
+   fastfetch). Se descartó por "hacerlo sencillo primero".
+2. **cava-bg: visualizador en el FONDO del escritorio** ([leriart/cava-bg](https://github.com/leriart/cava-bg),
+   Rust + wgpu + layer-shell). Detecta el wallpaper y le extrae los colores; **soporta mpvpaper**,
+   que es justo lo que ya corre aquí. ⚠️ **Aviso Optimus**: sería otra capa de GPU constante encima
+   del vídeo en bucle de mpvpaper. Medir batería antes de casarse con ello.
+3. **Módulo de música en waybar (`mpris`)** — waybar depende de `playerctl` y `libmpdclient`, así
+   que el módulo `mpris` **sí está disponible**. ⚠️ Filtrar por **`firefox`**, no por `zen` (ver
+   `00-contexto-y-hardware.md` §MPRIS). La sidebar de Quickshell de ML4W ya muestra MPRIS, así que
+   esto solo aporta si se quiere en la barra.
+4. **Barras de cava EN la waybar** — ⚠️ **el módulo `cava` nativo NO es viable**: verificado que el
+   binario de Arch/CachyOS **no lo trae compilado** (`waybar -c` con un módulo `cava` responde
+   `Disabling module "cava", Unknown module`). Haría falta un módulo `custom/` alimentado del
+   output `raw` de cava (patrón: [fr33root5/cava-setup](https://github.com/fr33root5/cava-setup)),
+   o compilar waybar a mano.
+5. **Reproductor de música propiamente dicho** — decisión **abierta**: el usuario se plantea montar
+   su propia app self-hosted accesible por navegador desde cualquier sitio. Si lo hace, **MPD+rmpc
+   pierde sentido** (sería una segunda biblioteca en paralelo). Nota de diseño clave para esa app:
+   implementar la **Media Session API** (`navigator.mediaSession.metadata` + handlers) → aparece
+   sola en la sidebar de ML4W, en waybar y en las teclas multimedia, como si fuera nativa. Firefox
+   ya expone MPRIS sin tocar nada. Alternativa existente: **Navidrome** (+ hablar la API de
+   Subsonic para heredar su ecosistema de clientes).
+
 ## B. Estética: bordes, colores, blur… (arquitectura ML4W verificada 2026-07)
 
 > Investigado sobre el sistema real. No hace falta redescubrir cómo funciona; aquí está.

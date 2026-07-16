@@ -1,0 +1,41 @@
+# cava — visualizador de audio. Se despliega a ~/.config/cava/config.
+#
+# ~/.config/cava NO es symlink al árbol de ML4W: es namespace propio → cero deriva upstream
+# (mismo razonamiento que ~/.config/ml4w-juanjo/ para los logos de fastfetch).
+#
+# Se muestra/oculta con SUPER+SHIFT+C (ver overlay/hypr/custom.lua). El toggle MATA cava al
+# ocultar, así que esto solo corre mientras se ve → el framerate no penaliza la batería en reposo.
+
+[general]
+framerate = 60
+# 0 = auto: se ajusta al ancho de la ventana.
+bars = 0
+autosens = 1
+
+[input]
+# Lee del monitor del sink de PipeWire → visualiza CUALQUIER audio del sistema (Zen, VLC,
+# un juego), no de un reproductor concreto.
+# 'auto' verificado funcionando en esta máquina (PoC 2026-07: picos de 86/100 con Zen).
+# Si algún día falla la autodetección, fijar a mano:
+#   source = alsa_output.pci-0000_00_1f.3.analog-stereo.monitor
+method = pulse
+source = auto
+
+[output]
+method = ncurses
+channels = stereo
+
+[color]
+# 'default' = hereda el fondo del terminal → respeta la transparencia de kitty (look glass).
+background = default
+foreground = default
+
+gradient = 1
+gradient_count = 4
+gradient_color_1 = '#00d4ff'
+gradient_color_2 = '#5b8cff'
+gradient_color_3 = '#a06bff'
+gradient_color_4 = '#ff6bd6'
+
+[smoothing]
+noise_reduction = 77

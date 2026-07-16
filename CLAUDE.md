@@ -4,10 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-A **planning/spec repository** for customizing the **ML4W** Hyprland dotfiles on the user's
-CachyOS laptop. As of the current state it contains **only Markdown planning documents** —
-no git repo, no scripts, no `overlay/`/`baseline/` directories yet. The docs describe work
-to be executed in a later session, directly over this folder (`~/Proyectos/hyprland-dotfiles`).
+The **overlay repository** customizing the **ML4W** Hyprland dotfiles on the user's CachyOS
+laptop. It is a git repo, and the overlay is **built and in production**: `overlay/`,
+`baseline/`, `aplicar.sh`, `check.sh` and `capturar-baseline.sh` all exist and work. The
+numbered Markdown docs are now design history and verified reference, not a to-do.
+
+**`README.md` is the source of truth for current state** — read it first. It lists what is
+deployed and the three-command workflow (`check.sh` → `aplicar.sh` → `check.sh`).
 
 Documentation is written in **Spanish**; match that language when editing these docs or
 writing commit messages, unless the user asks otherwise.
@@ -34,18 +37,21 @@ update, ignoring git.** Therefore:
 - Instead this repo is a small **overlay**: it versions only the files we customize, plus a
   script that re-applies them onto the ML4W tree after each update.
 
-Planned layout (to be created — see `01-estrategia-overlay.md` for the full spec):
+Layout (exists — see `01-estrategia-overlay.md` for the design rationale):
 
 - `overlay/` — our version of each customized file (source of truth).
 - `baseline/` — a pristine copy of those same files as ML4W ships them (for 3-way diffing
   after upstream updates).
-- `aplicar.sh` — copies our theme folder → `~/.config/...`, sets it as the active waybar theme
-  (writes `~/.config/ml4w/settings/waybar-theme.sh`), and relaunches waybar via `launch.sh`.
-- `capturar-baseline.sh` — snapshots the `ml4w-glass` base files into `baseline/`.
-- `check.sh` — **core tooling, not optional.** Two checks: (1) our theme deployed (overlay ≠
-  live → run `aplicar.sh`) and (2) base drift (baseline ≠ live `ml4w-glass` → ML4W updated the
-  base we copied from). Build it with the other two scripts; run before `aplicar.sh` after
-  each ML4W update.
+- `aplicar.sh` — deploys everything in `overlay/` onto the live tree and restarts what needs it.
+- `capturar-baseline.sh` — snapshots the ML4W base files into `baseline/`.
+- `check.sh` — **core tooling, not optional.** Two checks: (1) our files deployed (overlay ≠
+  live → run `aplicar.sh`) and (2) base drift (baseline ≠ live → ML4W updated a base we copied
+  from). Run before `aplicar.sh` after each ML4W update.
+
+Prefer deploying into **namespaces ML4W doesn't own** (`~/.config/cava/`,
+`~/.config/ml4w-juanjo/`) — the updater never prunes them, so there's zero drift. Files that
+must land inside the ML4W tree (anything under `~/.config/hypr`, which is a symlink into it)
+have to be listed in `check.sh`.
 
 ### Waybar customization = our own theme (key decision)
 
@@ -63,6 +69,15 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
 
 - CachyOS (Arch-based), Hyprland WM, **fish** shell. ML4W with the newer **Lua-based**
   Hyprland config.
+- **Hyprland 0.55 config is native Lua, and it breaks inherited intuition** — there is no
+  `hyprland.conf`, and `hyprctl dispatch` evaluates its argument as Lua
+  (`hyprctl dispatch closewindow class:foo` errors; use
+  `hyprctl dispatch 'hl.dsp.workspace.toggle_special("cava")'`). Also: `hl.dsp.*` only *builds*
+  a descriptor, so `hyprctl eval 'hl.dsp.window.close(anything)'` returns `ok` without
+  validating or executing — **it is not a way to test dispatchers**. `hl.window_rule` *does*
+  validate fields, so `hyprctl eval` is a reliable bench for those (use a fake class).
+  `~/.config/hypr/custom.lua` is ML4W's official hook, loaded last.
+  **Full verified details in `00-contexto-y-hardware.md` — don't re-derive them.**
 - **Optimus** laptop: Intel UHD 630 iGPU + NVIDIA GTX 1060 Mobile dGPU (proprietary drivers).
 - ML4W tree lives at `~/.mydotfiles/com.ml4w.dotfiles.stable/.config/...`, symlinked into
   `~/.config/...`. Editing `~/.config/waybar/...` edits the ML4W tree. `~/.mydotfiles` is
