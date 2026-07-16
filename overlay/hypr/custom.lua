@@ -7,19 +7,16 @@
 -- OJO: ~/.config/hypr SÍ es symlink al árbol de ML4W, así que este fichero aterriza DENTRO del
 -- árbol gestionado. Un update podría podarlo → check.sh lo vigila.
 
--- Visualizador de audio (cava) en un workspace especial propio.
--- Usamos "special:cava" y NO el "special:magic" que ya trae ML4W (SUPER+S, conf/keybindings/
--- default.lua:93-95): magic es el scratchpad genérico y conviene dejarlo libre.
+-- Visualizador de audio (cava). Es una ventana NORMAL: nace tilada en el workspace en el que
+-- estés y se coloca con las demás. Por eso aquí no hay window_rule — sin regla, Hyprland ya
+-- hace lo que queremos.
 --
--- La clase propia es NECESARIA: el terminal es kitty, y sin --class esta regla cazaría todas
--- las ventanas de kitty.
-hl.window_rule({
-    name = "cava-visualizer",
-    match = { class = "cava-visualizer" },
-    workspace = "special:cava",
-})
-
--- SUPER+SHIFT+C — verificado libre (ocupadas con SHIFT: A B G H M Q R S T W; H = hyprsunset).
+-- (Antes vivía en un workspace especial `special:cava`, pero tapaba la pantalla entera: una
+-- ventana sola en un workspace propio ocupa todo. Se descartó a favor del tile normal.)
+--
+-- La ventana se lanza con `--class cava-visualizer` (ver cava-toggle.sh). Esa clase propia no
+-- hace falta hoy, pero distingue el visualizador de una kitty cualquiera y deja la puerta
+-- abierta a añadirle reglas aquí sin tocar el script.
 hl.bind(
     "SUPER + SHIFT + C",
     hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/cava-toggle.sh"),

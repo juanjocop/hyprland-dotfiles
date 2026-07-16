@@ -37,21 +37,28 @@ Mejoras a aplicar vía overlay (aprobadas por el usuario):
 
 ## A-ter. Música y visualizador — cava YA existe, ampliaciones posibles
 
-Estado: **cava implementado (2026-07)**, scratchpad en `special:cava` a un **SUPER+SHIFT+C**.
-Ver README y `00-contexto-y-hardware.md` §Audio. Lee del monitor de PipeWire → visualiza cualquier
-audio, independiente del reproductor.
+Estado: **cava implementado (2026-07)**, ventana **tilada normal** a un **SUPER+SHIFT+C**: nace en
+el workspace activo y se coloca con las demás. Ver README y `00-contexto-y-hardware.md` §Audio.
+Lee del monitor de PipeWire → visualiza cualquier audio, independiente del reproductor.
+Verificado que **no toca la dGPU** (ncurses = CPU; kitty renderiza en la Intel del compositor).
 
-Ideas por orden de interés, todas **descartadas conscientemente** en la primera iteración:
+Ideas por orden de interés:
 
-1. **Gradiente atado al wallpaper (matugen)** — hoy los 4 colores del gradiente son fijos. ML4W
+1. **cava-bg: visualizador en el FONDO del escritorio** ([leriart/cava-bg](https://github.com/leriart/cava-bg),
+   Rust + wgpu + layer-shell) — **SIGUIENTE PASO, pedido por el usuario (2026-07)**. Detecta el
+   wallpaper y le extrae los colores; **soporta mpvpaper**, que es justo lo que ya corre aquí.
+   Resuelve lo que la ventana tilada no puede: barras *detrás* de todo, permanentes, sin tapar.
+   Está en AUR (paru disponible). ⚠️ **Aviso Optimus**: a diferencia de cava en ncurses, esto **sí**
+   renderiza en GPU (wgpu), y sería otra capa constante encima del vídeo en bucle de mpvpaper.
+   **Medir consumo y batería antes de casarse con ello** — y ojo, la dGPU ya está despierta a
+   3.47 W por culpa de Steam (`steamwebhelper`), así que medir con Steam cerrado para no confundir
+   las causas.
+2. **Gradiente atado al wallpaper (matugen)** — hoy los 4 colores del gradiente son fijos. ML4W
    genera su paleta con matugen desde el fondo (ver §B). Atar cava a esa paleta quedaría redondo,
    pero obliga a añadir una plantilla en `~/.config/matugen/config.toml` — **fichero de ML4W →
    deriva** — y a recargar cava al cambiar de fondo. Requiere `check.sh` de 3 estados (como
-   fastfetch). Se descartó por "hacerlo sencillo primero".
-2. **cava-bg: visualizador en el FONDO del escritorio** ([leriart/cava-bg](https://github.com/leriart/cava-bg),
-   Rust + wgpu + layer-shell). Detecta el wallpaper y le extrae los colores; **soporta mpvpaper**,
-   que es justo lo que ya corre aquí. ⚠️ **Aviso Optimus**: sería otra capa de GPU constante encima
-   del vídeo en bucle de mpvpaper. Medir batería antes de casarse con ello.
+   fastfetch). Se descartó por "hacerlo sencillo primero". (cava-bg trae su propia extracción de
+   color del wallpaper, así que si se adopta, esto puede volverse innecesario.)
 3. **Módulo de música en waybar (`mpris`)** — waybar depende de `playerctl` y `libmpdclient`, así
    que el módulo `mpris` **sí está disponible**. ⚠️ Filtrar por **`firefox`**, no por `zen` (ver
    `00-contexto-y-hardware.md` §MPRIS). La sidebar de Quickshell de ML4W ya muestra MPRIS, así que

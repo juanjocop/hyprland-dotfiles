@@ -21,7 +21,7 @@ nuestro trabajo con un comando en vez de perderlo.
 | **Waybar: botón fondo de vídeo** | Enciende/apaga un fondo de vídeo (mpvpaper) desde un botón de la barra | `scripts/livewallpaper.sh` |
 | **Luz nocturna (hyprsunset)** | Filtro de luz azul automático por horario **21:00 → 07:00** (4000 K) | `overlay/hypr/hyprsunset.conf` + systemd |
 | **Fastfetch: logo rotativo** | Muestra una imagen distinta al azar en cada arranque de terminal | `overlay/fastfetch/` |
-| **Visualizador de audio (cava)** | Barras que se mueven al ritmo, en un scratchpad. **SUPER+SHIFT+C** | `overlay/cava/` + `overlay/hypr/custom.lua` |
+| **Visualizador de audio (cava)** | Barras que se mueven al ritmo, como ventana tilada más. **SUPER+SHIFT+C** | `overlay/cava/` + `overlay/hypr/custom.lua` |
 
 ---
 
@@ -81,24 +81,36 @@ Notas:
 
 ## Visualizador de audio (cava)
 
-**SUPER+SHIFT+C** muestra/oculta un scratchpad con las barras moviéndose al ritmo. Requiere el
-paquete `cava` (`sudo pacman -S cava`); `aplicar.sh` no lo instala porque necesita sudo, pero
-`check.sh` avisa si falta.
+**SUPER+SHIFT+C** abre/cierra las barras que se mueven al ritmo. Requiere el paquete `cava`
+(`sudo pacman -S cava`); `aplicar.sh` no lo instala porque necesita sudo, pero `check.sh` avisa
+si falta.
+
+**Es una ventana normal**: nace **tilada en el workspace en el que estés** y se coloca con las
+demás. Se mueve, redimensiona y manda a otro workspace con los atajos normales de Hyprland.
 
 **Visualiza cualquier audio del sistema.** cava lee del monitor de PipeWire, no de un reproductor:
 da igual que suene Zen, VLC, un juego o una web. No hay nada que configurar por reproductor.
+
+**No toca la GPU dedicada** (verificado 2026-07 comparando `nvidia-smi` con y sin cava): cava dibuja
+texto con ncurses = CPU pura, y kitty renderiza en la GPU del compositor, que es la Intel. Nada va
+a la NVIDIA sin pedirlo con las variables de PRIME offload.
 
 Cómo está montado:
 
 - `overlay/cava/config` → `~/.config/cava/config`. Gradiente de 4 colores, `background = default`
   para heredar la transparencia de kitty (look glass).
-- `overlay/hypr/custom.lua` → el **hook oficial** de ML4W (lo carga el último). Define el bind y
-  una `window_rule` que manda la clase `cava-visualizer` al workspace especial `special:cava`.
+- `overlay/hypr/custom.lua` → el **hook oficial** de ML4W (lo carga el último). Solo define el bind:
+  **no hay window_rule**, porque sin regla Hyprland ya la tila donde queremos.
 - `overlay/ml4w-juanjo/scripts/cava-toggle.sh` → el toggle.
 
-**El toggle mata cava al ocultar**, no lo esconde: en un portátil no tiene sentido gastar CPU en
-barras que no se ven. Por eso "está visible" se consulta con `pgrep cava`, y cerrar = `pkill cava`
+**El toggle mata cava al cerrar** en vez de esconderlo: en un portátil no tiene sentido gastar CPU
+en barras que no se ven. Por eso el estado se consulta con `pgrep cava`, y cerrar = `pkill cava`
 (kitty se cierra sola al morir el proceso que lanzó con `-e`).
+
+> **Descartado: el workspace especial.** La primera versión metía cava en un `special:cava` con
+> toggle de scratchpad. Tapaba la pantalla entera, porque una ventana sola en un workspace propio
+> ocupa todo el espacio — y flotarla la hacía aún más grande (1920x1080). Se cambió a ventana tilada
+> normal, que además dejó el montaje más simple (sin regla y sin `toggle_special`).
 
 Para cambiar los colores, edita el gradiente en `overlay/cava/config` y `./aplicar.sh`. Atarlo a la
 paleta del wallpaper (matugen) está en el roadmap: quedaría mejor pero obliga a tocar un fichero de
@@ -112,7 +124,7 @@ ML4W → deriva.
 overlay/                     ← fuente de verdad: solo lo que personalizamos
   waybar/themes/ml4w-glass-juanjo/   theme propio (temps + botón fondo vídeo)
   hypr/hyprsunset.conf               horario de luz nocturna
-  hypr/custom.lua                    hook oficial de ML4W: bind + window rule de cava
+  hypr/custom.lua                    hook oficial de ML4W: bind de cava
   cava/config                        config del visualizador (gradiente, fuente de audio)
   ml4w-juanjo/scripts/cava-toggle.sh script del toggle SUPER+SHIFT+C
   fastfetch/config.jsonc             config con el glob del logo
