@@ -126,12 +126,58 @@ barras que no se ven. Con ambos modos apagados, `pgrep cava` no devuelve nada.
 - **Los colores salen de matugen**: el QML lee `~/.config/ml4w/colors/colors.json` con un `FileView`
   que vigila cambios → al cambiar de wallpaper, matugen regenera la paleta y **las barras se
   re-colorean solas**, sin reiniciar nada. Así pegan con waybar y los bordes.
-- Para retocar el aspecto: `stripHeight`, `barCount`, `gap`, `smoothMs` y `peakFall` están juntos
-  arriba del `shell.qml`. Si tocas `barCount`, toca también `bars` en `cava-raw.conf`.
+  ⚠️ **Ojo al elegir colores de esa paleta**: es Material You *oscura*, así que `primary` (#b1c5ff) y
+  `tertiary` (#e1bbdd) son colores de **primer plano** — dos pasteles claros de luminosidad casi
+  idéntica que en degradado se leen como **un color plano** (pasó en la v1). El contraste está en
+  los `_container`: de ahí el degradado de 3 paradas `primary_container` (marino) → `primary` →
+  `tertiary`.
+- **Las barras van difuminadas y los picos no**: los picos se dibujan aparte, fuera del blur, para
+  que queden nítidos. Metidos dentro desaparecían — una línea de 2px con un blur de radio ~10px se
+  reparte sobre ~20px y su intensidad cae a ~1/10.
 
-> **Nota de depuración**: `qs` lanzado en segundo plano desde un shell no interactivo puede morir al
-> salir el padre. Lanzado por Hyprland (que es lo que hace la keybind) sobrevive sin problema. Si al
-> probar a mano parece que no arranca, pruébalo con
+### Ajustes del modo fondo
+
+Todos juntos arriba del `shell.qml`. Ciclo para probar: editar → `./aplicar.sh` → SUPER+ALT+C dos
+veces (apagar y encender).
+
+| Ajuste | Valor | Qué hace |
+|---|---|---|
+| `stripHeight` | 250 | Alto de la franja en px |
+| `barCount` | 64 | Nº de barras. **Si lo tocas, toca también `bars` en `cava-raw.conf`** |
+| `gap` | 6 | Separación entre barras |
+| `smoothMs` | 90 | Suavizado entre frames de cava |
+| `peakFall` | 1.2 | A cuánto cae el pico por frame |
+| `barBlur` | 0.4 | Desenfoque, 0-1 (fracción de `blurMaxPx`) |
+| `blurMaxPx` | 24 | Px de blur a los que equivale `barBlur = 1` |
+| `stripOpacity` | 0.7 | Transparencia del conjunto |
+| `glowEnabled` | false | Halo tipo neón (ver abajo) |
+
+**`barBlur` y `stripOpacity` van emparejadas**: cuanto más blur, menos se nota la transparencia — el
+desenfoque reparte el color sobre más superficie y se lee como mancha sólida. Al subir uno, baja la
+otra.
+
+### Tres cosas que NO hay que "arreglar"
+
+Son decisiones, no descuidos. Están comentadas en el código; aquí el resumen:
+
+1. **`autoPaddingEnabled: false` en el `MultiEffect`.** En `true` (su default) amplía el área de
+   render para que el blur no se recorte, pero **desplaza las barras hacia abajo**. Como los picos
+   se dibujan sin pasar por el efecto, ellos quedaban en su sitio y las barras no → descuadre
+   visible. Verificado con capturas.
+2. **El blur se hace en Qt, no con `hl.layer_rule` de Hyprland.** El layer_rule (el idiom que ML4W
+   usa para la waybar) difumina lo que hay *detrás* y depende del blur **global**, que la variante
+   de decoración activa (`conf/decorations/juanjo.lua`) tiene apagado **a propósito** ("gamemode,
+   wallpaper nítido detrás"). Activarlo afectaría a todo el escritorio para lograr un efecto en una
+   franja.
+3. **El glow está montado pero apagado.** Probado y descartado (2026-07): duplica la composición
+   (renderiza las barras dos veces por frame) sin aportar lo suficiente. Queda a un
+   `glowEnabled = true` de distancia. Blur y glow **no son lo mismo**: el blur emborrona la barra
+   entera; el glow la deja nítida y pone el desenfoque **alrededor**, como halo de neón.
+
+> **Depuración**: para ver cómo queda algo, **haz una captura** en vez de adivinar —
+> `grim -g "0,830 1920x250" /tmp/x.png` recorta justo la franja. Y `qs` lanzado en segundo plano
+> desde un shell no interactivo puede morir al salir el padre; lanzado por Hyprland (lo que hace la
+> keybind) va bien. Para probarlo a mano:
 > `hyprctl dispatch 'hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/cava-toggle.sh bg")'`.
 
 ### Decisiones descartadas (para no rehacerlas)

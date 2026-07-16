@@ -32,3 +32,12 @@ hl.bind(
     hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/cava-toggle.sh bg"),
     { description = "Toggle visualizador cava (fondo)" }
 )
+
+-- NOTA sobre el blur de las barras: se hace en Qt (MultiEffect dentro del shell.qml), NO con
+-- `hl.layer_rule({ match = { namespace = "cava-bg-juanjo" }, blur = true })`.
+--
+-- Ese layer_rule es el idiom de ML4W para la waybar (conf/decorations/blur.lua:32) y funciona,
+-- pero difumina lo que hay DETRÁS de la capa y depende del blur GLOBAL de Hyprland — que en la
+-- variante de decoración activa (`conf/decorations/juanjo.lua`) está **desactivado a propósito**
+-- ("gamemode, wallpaper nítido detrás"). Activarlo afectaría a todo el escritorio, no solo a las
+-- barras. Por eso el blur va por Qt: difumina las barras en sí y no toca esa decisión.
