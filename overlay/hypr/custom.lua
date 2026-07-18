@@ -41,3 +41,19 @@ hl.bind(
 -- variante de decoración activa (`conf/decorations/juanjo.lua`) está **desactivado a propósito**
 -- ("gamemode, wallpaper nítido detrás"). Activarlo afectaría a todo el escritorio, no solo a las
 -- barras. Por eso el blur va por Qt: difumina las barras en sí y no toca esa decisión.
+
+-- Transparencia de VS Code (code-oss), SOLO para esa clase — el resto de ventanas siguen con la
+-- opacidad global de la variante `juanjo` (activa 1.0 / inactiva 0.9).
+--
+-- OJO — matiz honesto: la opacidad de Hyprland es de VENTANA ENTERA, no "solo del fondo". A 0.95
+-- el texto también está al 95%, pero ese 5% es imperceptible para leer y basta para que el fondo
+-- respire un poco. Transparencia real solo-fondo (texto 100% opaco) exigiría inyectar CSS con una
+-- extensión, que no es nativo y se rompe en cada update de VS Code — descartado a propósito.
+--
+-- `opacity = "<activa> override <inactiva> override"`: el `override` evita que se multiplique con
+-- el inactive_opacity=0.9 global, así los valores son exactos. Suben/bajan libremente aquí.
+hl.window_rule({
+    name = "code-oss-opacity",
+    match = { class = "code-oss" },
+    opacity = "0.95 override 0.88 override",
+})
