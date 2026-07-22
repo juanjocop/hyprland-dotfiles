@@ -33,7 +33,7 @@
         //"backlight",
         "bluetooth",
         "network",
-        "temperature",
+        "custom/cputemp",
         "custom/gputemp",
         "battery",
         "group/hardware",

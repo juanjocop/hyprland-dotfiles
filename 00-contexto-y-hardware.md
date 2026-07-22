@@ -1,14 +1,32 @@
 # 00 — Contexto y hardware (datos verificados)
 
-> Todo lo de aquí está comprobado en el equipo real (2026-07). No hace falta redescubrirlo.
+> Todo lo de aquí está comprobado en los equipos reales (2026-07). No hace falta redescubrirlo.
 
-## Entorno
+## Dos equipos, un solo overlay
 
-- SO: **CachyOS** (Arch-based). WM: **Hyprland**. Shell del usuario: **fish**.
-- Dotfiles: **ML4W** (`com.ml4w.dotfiles.stable`), versión nueva con **config de Hyprland
-  basada en Lua**.
+El overlay corre en **dos máquinas**, y `overlay/` es **byte a byte el mismo** en ambas: lo que
+cambia de una a otra se resuelve **en tiempo de ejecución** (los scripts detectan el hardware),
+no con carpetas por equipo ni plantillas. Así `check.sh` puede seguir comparando overlay ↔ vivo
+directamente, que es la regla de oro del repo.
 
-## Hardware relevante
+| | **Portátil** (equipo original) | **Sobremesa** `cachyos-equipaso` (verificado 2026-07-22) |
+|---|---|---|
+| Chasis | Portátil Optimus | Gigabyte B650E AORUS ELITE X AX ICE |
+| CPU / sensor | Intel 6 núcleos → `coretemp` | AMD Ryzen (Granite Ridge) → **`k10temp`**, `temp1_label=Tctl` |
+| iGPU | Intel UHD 630 | AMD Radeon integrada (`amdgpu`) |
+| GPU NVIDIA | GTX 1060 Mobile (GP106M), **duerme en reposo** | **RTX 5070 Ti** (GB203), siempre `active` (mueve las pantallas) |
+| Dirección PCI de la NVIDIA | `0000:01:00.0` | `0000:01:00.0` (coincide, pero **no se asume**: se resuelve con `lspci`) |
+| Batería | sí | **no** — en `power_supply` solo `hidpp_battery_0` (ratón Logitech, `scope=Device`) |
+| Pantallas | `eDP-1` | `DP-1` 2560x1440@240 (x=2560) y `DP-2` 2560x1440@144 (x=0) |
+| Hyprland | 0.55.4 | 0.56.0 |
+
+**La base de ML4W es idéntica en los dos** (comprobado con `diff` sobre los 5 ficheros que
+vigila `check.sh`): cero deriva, el overlay entra limpio en ambos.
+
+Lo específico de cada equipo (qué monitor usa el fondo de vídeo, dónde están los vídeos) vive
+en **`~/.config/ml4w-juanjo/local.env`**, que **no se versiona**.
+
+## Hardware relevante (portátil)
 
 - Portátil **Optimus** (gráfica híbrida):
   - iGPU: **Intel UHD 630** (CoffeeLake-H GT2).
@@ -17,14 +35,20 @@
 
 ## Sensores (comandos verificados)
 
-### CPU — sensor `coretemp`
-- `sensors` muestra `coretemp-isa-0000` con `Package id 0` y `Core 0..5`.
-- Ruta **estable** (recomendada para waybar; `hwmonN` NO es estable entre arranques):
-  ```
-  hwmon-path-abs = /sys/devices/platform/coretemp.0/hwmon
-  input-filename = temp1_input      # = "Package id 0"
-  ```
-  Verificado: `/sys/devices/platform/coretemp.0/hwmon/hwmon6/temp1_input` existe.
+### CPU — `coretemp` (Intel) / `k10temp` (AMD)
+
+⚠️ **La ruta del sensor es lo que más difiere entre los dos equipos**, por eso ya no se cablea:
+`scripts/cputemp.sh` recorre `/sys/class/hwmon/*/name` y toma el primero que case `k10temp` o
+`coretemp`. Buscar por **nombre** resuelve de paso que `hwmonN` **no es estable entre
+arranques** (el motivo original de usar `hwmon-path-abs`). En ambos chips el sensor bueno es
+`temp1_input`.
+
+| Equipo | `name` | Ruta estable | `temp1_input` es |
+|---|---|---|---|
+| Portátil | `coretemp` | `/sys/devices/platform/coretemp.0/hwmon` | `Package id 0` |
+| Sobremesa | `k10temp` | `/sys/devices/pci0000:00/0000:00:18.3/hwmon` | `Tctl` |
+
+(Se dejan las rutas anotadas como referencia, pero **el script no las usa**.)
 
 ### GPU — NVIDIA
 - `nvidia-smi` disponible y la dGPU responde (drivers propietarios activos).
@@ -34,6 +58,13 @@
   ```
   Devuelve un entero (ej. `53`).
 - Uso/VRAM (para el roadmap): `--query-gpu=utilization.gpu,memory.used,memory.total`.
+- `scripts/gputemp.sh` pide **nombre y temperatura en la misma llamada**
+  (`--query-gpu=name,temperature.gpu`) para que el tooltip diga la tarjeta real de cada equipo
+  sin coste extra, y resuelve la dirección PCI con
+  `lspci -D -d 10de: -n` filtrando la clase `0300` (VGA) o `0302` (3D controller).
+- La puerta anti-despertar sigue siendo `power/runtime_status`: **solo se llama a `nvidia-smi`
+  si NO está dormida**. En el sobremesa siempre está `active`, así que no cambia nada; en el
+  portátil sigue sin despertar la dGPU.
 
 ### La dGPU idlea a ~3.47 W y la mantiene despierta SDDM (verificado 2026-07)
 
@@ -85,12 +116,15 @@ el reproductor; es contexto para módulos de waybar/Quickshell futuros.
   (`.config/quickshell/SidebarApp/SidebarWindow.qml:508`, `import Quickshell.Services.Mpris`)
   → lo que suene en Zen/VLC ya sale ahí con controles, sin configurar nada.
 
-## Hyprland 0.55: la config es Lua nativa (verificado 2026-07)
+## Hyprland 0.55 / 0.56: la config es Lua nativa (verificado 2026-07)
 
 Cosas que rompen la intuición heredada de la config clásica de Hyprland. **No redescubrirlas.**
 
 - **No hay `hyprland.conf`.** El entrypoint es `~/.config/hypr/hyprland.lua`, Lua puro con
-  `require()`. Hyprland 0.55.4.
+  `require()`. Verificado en **0.55.4** (portátil) y **0.56.0** (sobremesa): misma API, y ML4W
+  sigue usando `hl.window_rule` / `hl.bind` / `hl.dsp.exec_cmd` en `conf/ml4w.lua`.
+- El hook `custom.lua` sigue en pie en 0.56: `hyprland.lua:40-43` comprueba que el fichero
+  exista y hace `require("custom")` **después** de todos los `conf.*`.
 - **`hyprctl dispatch` evalúa su argumento como Lua**, envolviéndolo en `hl.dispatch(...)`. La
   sintaxis de string clásica **ya NO funciona**:
   ```bash

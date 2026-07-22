@@ -14,6 +14,11 @@ backups/
 *.pfx
 .env
 .env.*
+
+# Preferencias por máquina (monitor del fondo de vídeo, carpeta de vídeos). Viven en
+# ~/.config/ml4w-juanjo/local.env y NO se versionan: el overlay es idéntico en todos los
+# equipos y lo que cambia de uno a otro se queda fuera de git.
+local.env
 *_rsa
 *_ed25519
 id_*

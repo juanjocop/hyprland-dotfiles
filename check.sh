@@ -14,12 +14,14 @@ OURS=(
   waybar/themes/ml4w-glass-juanjo/config
   waybar/themes/ml4w-glass-juanjo/modules-custom.json
   waybar/themes/ml4w-glass-juanjo/style.css
+  waybar/themes/ml4w-glass-juanjo/scripts/cputemp.sh
   waybar/themes/ml4w-glass-juanjo/scripts/gputemp.sh
   waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh
   waybar/themes/ml4w-glass-juanjo/scripts/nightlight.sh
   waybar/themes/ml4w-glass-juanjo/default/style.css
   waybar/themes/ml4w-glass-juanjo/default/config.sh
   hypr/hyprsunset.conf
+  hypr/conf/decorations/juanjo.lua
   cava/config
   ml4w-juanjo/cava-bg/cava-raw.conf
   ml4w-juanjo/quickshell/cavabg/shell.qml
@@ -94,10 +96,15 @@ if ! compgen -G "$logos_dir/*.png" >/dev/null; then
   echo "⚠  sin PNG en $logos_dir  → ./aplicar.sh (el logo aleatorio de fastfetch quedaría vacío)"; status=1
 fi
 
-# 7) cava (visualizador): binario externo, dependencia de SUPER+SHIFT+C. aplicar.sh no lo
-#    instala (requiere sudo) → aquí solo avisamos. Sin él el toggle abre un terminal que muere.
+# 7) Binarios externos de los que dependen dos personalizaciones. aplicar.sh no los instala
+#    (requieren sudo) → aquí solo avisamos.
+#      · cava     → los dos modos del visualizador. Sin él el toggle abre un terminal que muere.
+#      · mpvpaper → el botón de fondo de vídeo. Sin él el botón no enciende nada.
 if ! command -v cava >/dev/null; then
-  echo "⚠  cava NO instalado  → sudo pacman -S cava (SUPER+SHIFT+C no funcionará)"; status=1
+  echo "⚠  cava NO instalado  → sudo pacman -S cava (SUPER+SHIFT+C / SUPER+ALT+C no funcionarán)"; status=1
+fi
+if ! command -v mpvpaper >/dev/null; then
+  echo "⚠  mpvpaper NO instalado  → sudo pacman -S mpvpaper (el botón de fondo de vídeo no hará nada)"; status=1
 fi
 
 [[ $status -eq 0 ]] && echo "✔  todo en sync (theme propio desplegado y activo; base sin cambios; fastfetch rotativo; cava listo)."

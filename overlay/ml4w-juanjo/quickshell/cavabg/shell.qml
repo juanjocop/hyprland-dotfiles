@@ -21,7 +21,17 @@ ShellRoot {
     id: root
 
     // ── Ajustes visuales ──
-    readonly property int stripHeight: 250
+    //
+    // Alto de la franja, como FRACCIÓN del alto de la pantalla y no en px fijos: los 250 px se
+    // calibraron en 1080p, y en un 1440p esos mismos píxeles ocupan un 25 % menos de pantalla
+    // (se veían bajas). Con la proporción, cada monitor recibe el mismo peso visual y el overlay
+    // sigue siendo idéntico en las dos máquinas — que es justo lo que se evita con un valor
+    // por equipo.
+    //
+    //   1080p → 250 px (idéntico a antes)   ·   1440p → 333 px
+    //
+    // Para cambiar el tamaño, toca este ratio, no píxeles.
+    readonly property real stripRatio: 250 / 1080   // ≈ 0.231
     readonly property int barCount: 64      // DEBE coincidir con `bars` en cava-bg/cava-raw.conf
     readonly property int gap: 6
     readonly property int smoothMs: 90      // suavizado entre frames de cava
@@ -135,7 +145,9 @@ ShellRoot {
                 left: true
                 right: true
             }
-            implicitHeight: root.stripHeight
+            // Proporcional a ESTA pantalla: con monitores de distinto alto, cada franja se
+            // dimensiona sola en vez de heredar un px fijo pensado para otra resolución.
+            implicitHeight: Math.round(win.modelData.height * root.stripRatio)
 
             // Solo LAS BARRAS van en esta capa oculta; quien las pinta en pantalla es el
             // MultiEffect de abajo, ya difuminadas. Los picos NO van aquí (ver más abajo).

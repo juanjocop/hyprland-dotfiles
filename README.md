@@ -13,6 +13,53 @@ nuestro trabajo con un comando en vez de perderlo.
 
 ---
 
+## Un solo overlay para varios equipos
+
+Corre en dos máquinas —un **portátil** Optimus (Intel + GTX 1060 Mobile, `eDP-1`, con batería) y
+un **sobremesa** AMD con RTX 5070 Ti y dos monitores— y `overlay/` es **byte a byte el mismo en
+las dos**. Lo que cambia de hardware se resuelve **al ejecutarse**, no con carpetas por equipo
+ni plantillas:
+
+| Qué difiere | Cómo se resuelve |
+|---|---|
+| Sensor de CPU (`coretemp` ↔ `k10temp`) | `scripts/cputemp.sh` busca el hwmon por **nombre** |
+| Dirección PCI y modelo de la GPU | `scripts/gputemp.sh` los saca de `lspci` y de `nvidia-smi` |
+| Qué monitor usa el fondo de vídeo | `scripts/livewallpaper.sh` toma el monitor **enfocado** |
+| Sin batería en el sobremesa | waybar descarta el módulo solo si no hay ninguna |
+
+Así se mantiene intacta la regla de oro (*el vivo es una copia byte a byte del overlay*) y
+`check.sh` puede seguir comparando overlay ↔ vivo sin ningún paso de render.
+
+**Lo que sí es de cada máquina** va en `~/.config/ml4w-juanjo/local.env`, que **no se versiona**
+(y que no hace falta crear si valen los valores por defecto):
+
+```bash
+# ~/.config/ml4w-juanjo/local.env
+LIVE_WALLPAPER_MONITOR=DP-1                    # si no, el monitor enfocado
+LIVE_WALLPAPER_FOLDER=$HOME/Vídeos/hidamari    # carpeta de vídeos del fondo
+LIVE_WALLPAPER_INTERVAL=300                    # segundos entre vídeos
+```
+
+> ⚠️ **La ruta distingue mayúsculas.** Si el botón dice *"Sin vídeos en …"* teniendo vídeos, casi
+> seguro es eso: `Hidamari` y `hidamari` son carpetas distintas. El aviso imprime la ruta exacta
+> que buscó — compárala con `ls ~/Vídeos`. Y solo cuenta `*.mp4`, `*.mkv` y `*.webm`.
+
+### Estrenar el overlay en un equipo nuevo
+
+```bash
+sudo pacman -S cava mpvpaper       # las dos únicas dependencias que aplicar.sh no instala
+git clone … && cd hyprland-dotfiles
+./check.sh                         # confirma que la base de ML4W no ha derivado
+./aplicar.sh
+./check.sh                         # "todo en sync"
+```
+
+Y dos cosas a mano después: elegir la variante de decoración **"Juanjo"** en la GUI de ML4W
+(*Appearance*) —`aplicar.sh` la deja disponible pero no la fuerza, para no pelear con el
+selector— y poner vídeos en la carpeta si se quiere el fondo de vídeo.
+
+---
+
 ## Qué incluye (todo desplegado y en producción)
 
 | Personalización | Qué hace | Dónde |
@@ -87,7 +134,7 @@ pintando lo mismo):
 | Atajo | Modo | Qué es |
 |---|---|---|
 | **SUPER+SHIFT+C** | **Ventana** | cava en una kitty, **tilada en el workspace actual**. Se mueve/redimensiona como cualquier ventana. |
-| **SUPER+ALT+C** | **Fondo** | Franja de barras de 250px abajo, **sobre el vídeo de mpvpaper y debajo de las ventanas**. Widget Quickshell propio. |
+| **SUPER+ALT+C** | **Fondo** | Franja de barras abajo (≈23 % del alto de la pantalla: 250 px en 1080p, 333 en 1440p), **sobre el vídeo de mpvpaper y debajo de las ventanas**. Widget Quickshell propio. |
 
 Requiere el paquete `cava` (`sudo pacman -S cava`); `aplicar.sh` no lo instala porque necesita sudo,
 pero `check.sh` avisa si falta. Quickshell ya viene con ML4W (repos oficiales de Arch).
@@ -142,7 +189,7 @@ veces (apagar y encender).
 
 | Ajuste | Valor | Qué hace |
 |---|---|---|
-| `stripHeight` | 250 | Alto de la franja en px |
+| `stripRatio` | 250/1080 | Alto de la franja como **fracción del alto del monitor**, no en px: 250 px se calibraron en 1080p y en 1440p se veían bajos. Sale 250 px en 1080p y 333 en 1440p, y cada monitor se dimensiona solo |
 | `barCount` | 64 | Nº de barras. **Si lo tocas, toca también `bars` en `cava-raw.conf`** |
 | `gap` | 6 | Separación entre barras |
 | `smoothMs` | 90 | Suavizado entre frames de cava |
@@ -175,7 +222,9 @@ Son decisiones, no descuidos. Están comentadas en el código; aquí el resumen:
    entera; el glow la deja nítida y pone el desenfoque **alrededor**, como halo de neón.
 
 > **Depuración**: para ver cómo queda algo, **haz una captura** en vez de adivinar —
-> `grim -g "0,830 1920x250" /tmp/x.png` recorta justo la franja. Y `qs` lanzado en segundo plano
+> `grim -o <monitor> /tmp/x.png` y recortar, o directamente la franja: en 1080p
+> `grim -g "0,830 1920x250"`, en 1440p `grim -g "<x>,1190 2560x250"` (la `x` del monitor sale de
+> `hyprctl monitors -j`; el sobremesa tiene DP-1 en x=2560). Y `qs` lanzado en segundo plano
 > desde un shell no interactivo puede morir al salir el padre; lanzado por Hyprland (lo que hace la
 > keybind) va bien. Para probarlo a mano:
 > `hyprctl dispatch 'hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/cava-toggle.sh bg")'`.

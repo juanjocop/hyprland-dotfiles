@@ -3,9 +3,23 @@
 # Sin service ni autostart: solo corre cuando lo activas con el botón; al reiniciar sesión
 # arranca apagado. Uso: status (JSON para waybar) | toggle (alterna y refresca el módulo).
 #
-# Config (sobreescribible por variables de entorno):
+# Preferencias POR MÁQUINA, fuera de git: el overlay es idéntico en todos los equipos, así que
+# lo que cambia de uno a otro (qué monitor, qué carpeta) vive aquí. waybar lanza este script sin
+# entorno propio, por eso no basta con exportar las variables en el shell.
+# shellcheck source=/dev/null
+[ -f "$HOME/.config/ml4w-juanjo/local.env" ] && . "$HOME/.config/ml4w-juanjo/local.env"
+
+# Monitor por defecto: el que tenga el foco, con el primero como respaldo. Sustituye a la
+# constante eDP-1, que solo valía en el portátil (allí sigue saliendo eDP-1 por ser el único).
+# Se puede fijar a mano en local.env. jq es dependencia de ML4W (lo usa su propio launch.sh).
+pick_monitor() {
+    hyprctl monitors -j 2>/dev/null |
+        jq -r 'map(select(.focused)) + . | .[0].name // empty' 2>/dev/null
+}
+
+# Config (sobreescribible por local.env o por variables de entorno):
 FOLDER="${LIVE_WALLPAPER_FOLDER:-$HOME/Vídeos/Hidamari}"   # carpeta de vídeos (NO versionada)
-MONITOR="${LIVE_WALLPAPER_MONITOR:-eDP-1}"
+MONITOR="${LIVE_WALLPAPER_MONITOR:-$(pick_monitor)}"
 INTERVAL="${LIVE_WALLPAPER_INTERVAL:-300}"                 # segundos entre cambios de vídeo
 SIGNAL=8                                                   # = "signal" del módulo (refresco)
 

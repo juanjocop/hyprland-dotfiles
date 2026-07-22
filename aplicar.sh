@@ -67,4 +67,10 @@ cp -f "$ROOT/overlay/ml4w-juanjo/scripts/cava-toggle.sh" "$DEST/ml4w-juanjo/scri
 chmod +x "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
 cp -f "$ROOT/overlay/hypr/custom.lua" "$DEST/hypr/custom.lua"
 
+# 9. Recargar Hyprland para que entren custom.lua (los binds de cava) y las variantes de
+#    decoración. Imprescindible en un equipo NUEVO: allí custom.lua no existía, y ML4W solo hace
+#    require("custom") si el fichero está — sin recarga los binds no se registran (verificado).
+#    `|| true`: aplicar.sh también debe poder correrse sin sesión de Hyprland viva (p. ej. TTY).
+hyprctl reload >/dev/null 2>&1 || true
+
 echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00 + botón manual; fastfetch con logo aleatorio; variante decoración 'Juanjo' disponible en Appearance; cava en SUPER+SHIFT+C)."

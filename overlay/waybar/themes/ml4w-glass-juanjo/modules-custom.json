@@ -1,24 +1,26 @@
 {
-    // Temperatura CPU — módulo nativo de waybar.
-    // Ruta ESTABLE por hwmon-path-abs + input-filename (hwmonN cambia entre arranques).
-    // Verificado: /sys/devices/platform/coretemp.0/hwmon/hwmonN/temp1_input = "Package id 0".
-    "temperature": {
-        "hwmon-path-abs": "/sys/devices/platform/coretemp.0/hwmon",
-        "input-filename": "temp1_input",
-        "critical-threshold": 85,
+    // Temperatura CPU — script propio en vez del módulo `temperature` nativo.
+    // El nativo obliga a fijar hwmon-path-abs, y esa ruta es justo lo que cambia entre equipos
+    // (Intel coretemp ↔ AMD k10temp). El script resuelve el sensor por NOMBRE de hwmon, que
+    // además es estable entre arranques (hwmonN no lo es). Umbral crítico: 85 °C.
+    "custom/cputemp": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/cputemp.sh",
+        "return-type": "json",
         "interval": 5,
-        "format": "󰔏 {temperatureC}°C",
-        "format-critical": "󰸁 {temperatureC}°C",
+        "format": "{}",
         "tooltip": true,
         "on-click": "~/.config/ml4w/settings/system-monitor.sh"
     },
-    // Temperatura GPU NVIDIA (Optimus) — script condicional: solo consulta nvidia-smi si la
-    // dGPU ya está despierta (runtime_status=active); si duerme, NO la despertamos.
+    // Temperatura GPU NVIDIA — script condicional: solo consulta nvidia-smi si la GPU ya está
+    // despierta (runtime_status=active); si duerme (portátil Optimus), NO la despertamos.
+    // La dirección PCI y el nombre de la tarjeta los resuelve el script, así que el tooltip
+    // dice la GPU real de cada equipo (por eso ya no hay "tooltip-format" fijo aquí).
     "custom/gputemp": {
         "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/gputemp.sh",
+        "return-type": "json",
         "interval": 5,
+        "format": "{}",
         "tooltip": true,
-        "tooltip-format": "GPU NVIDIA GTX 1060 Mobile",
         "on-click": "~/.config/ml4w/settings/system-monitor.sh"
     },
     // Fondo de vídeo (mpvpaper) — botón toggle ON/OFF. No arranca con el sistema.
