@@ -77,8 +77,13 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
   integrated Radeon iGPU, `amdgpu`) + **NVIDIA RTX 5070 Ti** (Blackwell, open kernel module
   driver `610.x`). The **monitors hang off the NVIDIA** (card1: DP-1 240Hz + DP-2); the AMD
   iGPU has nothing plugged in, so `amdgpu ... Cannot find any crtc or sizes` in the journal
-  is **benign noise**. Suspend/resume can leave a black screen — that's an NVIDIA modeset
-  resume issue, intermittent, not a dotfiles problem.
+  is **benign noise**. The **black screen after the monitors slept was not** an NVIDIA modeset
+  quirk, as first assumed: Hyprland *died* with SIGSEGV inside aquamarine 0.13.0
+  (`SDRMConnector::releaseCommitBuffers`, expired weak pointer) when the DP link dropped and
+  NVIDIA reported it as a hotplug. Fixed upstream by `c0bd9ed`, shipped in **aquamarine 0.14.0**
+  (installed 2026-07-29); the temporary `hypridle.conf` mitigation was reverted 2026-07-31 —
+  full diagnosis in issue #1. Moral: if a black screen returns, check `coredumpctl` for a
+  Hyprland crash **before** blaming the driver.
 
 Common to both:
 
