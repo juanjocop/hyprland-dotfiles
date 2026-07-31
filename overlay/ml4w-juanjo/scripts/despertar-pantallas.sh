@@ -27,12 +27,19 @@
 #
 # Que enable funciona con la sesión activa está verificado: en la prueba del 31-07 recuperó las
 # dos pantallas en menos de 2 s. Lo que fallaba era CUÁNDO y CUÁNTAS VECES se llamaba.
+#
+# hypridle nos llama DOS veces al reanudar (`after_sleep_cmd` y, unos segundos después, el
+# `on-resume` del listener de 11 min al mover el ratón). Si la primera funcionó, la segunda solo
+# aporta un parpadeo de más, así que se omite durante $VENTANA segundos. La marca se escribe solo
+# cuando el encendido SALE BIEN: si falla, la segunda llamada sigue siendo una segunda oportunidad.
 
 set -uo pipefail   # sin -e a propósito: ningún fallo suelto debe abortar el rescate de la pantalla
 
 LOG="$HOME/.cache/ml4w-juanjo/despertar-pantallas.log"
+SELLO="$HOME/.cache/ml4w-juanjo/despertar-pantallas.stamp"
 ESPERA_SESION=15   # s máximos esperando a que logind reactive la sesión
 INTENTOS=3
+VENTANA=30         # s durante los que NO se repite un encendido que ya salió bien
 
 mkdir -p "$(dirname "$LOG")"
 # Recorte para que no crezca sin fin (esto se ejecuta en cada reanudación).
@@ -69,7 +76,25 @@ sesion_activa() {
     [[ "$(loginctl show-session "$sid" -p Active --value 2>/dev/null)" == "yes" ]]
 }
 
+# Marca de "encendido que salió bien". Se escribe SOLO al terminar con éxito, nunca al empezar:
+# así un intento fallido no bloquea al siguiente, que es justo la segunda oportunidad que da
+# `on-resume` cuando el usuario toca el ratón.
+exito() { : > "$SELLO"; }
+reciente() {
+    [[ -f "$SELLO" ]] || return 1
+    local edad=$(( $(date +%s) - $(stat -c %Y "$SELLO" 2>/dev/null || echo 0) ))
+    (( edad >= 0 && edad < VENTANA ))
+}
+
 log "── despertar (sesión ${XDG_SESSION_ID:-?}) ──"
+
+# 0. Al reanudar se nos llama dos veces: `after_sleep_cmd` al despertar el sistema y, unos
+#    segundos después, el `on-resume` del listener de 11 min en cuanto el usuario mueve el ratón.
+#    Si la primera ya dejó las pantallas encendidas, la segunda solo aporta un parpadeo de más.
+if reciente; then
+    log "omitido: ya hubo un encendido correcto hace menos de ${VENTANA}s"
+    exit 0
+fi
 
 # 1. Esperar a que la sesión vuelva a estar activa (caso (a)).
 esperado=0
@@ -93,6 +118,7 @@ for (( i = 1; i <= INTENTOS; i++ )); do
     log "ciclo $i → $(estado)"
     if todas_encendidas; then
         log "OK en el ciclo $i"
+        exito
         exit 0
     fi
 done
@@ -104,7 +130,7 @@ sleep 2
 dpms enable
 sleep 1
 log "tras reload → $(estado)"
-todas_encendidas && { log "OK tras reload"; exit 0; }
+todas_encendidas && { log "OK tras reload"; exito; exit 0; }
 
 log "FALLO: pantallas sin recuperar. Revisar $HOME/.cache/ml4w-juanjo/ y el log de Hyprland."
 exit 1
