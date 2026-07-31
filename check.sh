@@ -26,6 +26,7 @@ OURS=(
   ml4w-juanjo/cava-bg/cava-raw.conf
   ml4w-juanjo/quickshell/cavabg/shell.qml
   ml4w-juanjo/scripts/cava-toggle.sh
+  ml4w-juanjo/scripts/despertar-pantallas.sh
   hypr/custom.lua
 )
 for f in "${OURS[@]}"; do
@@ -105,6 +106,27 @@ elif [[ -f "$wp_base" ]] && diff -q "$wp_base" "$wp_live" >/dev/null; then
   echo "⤴  ml4w-wallpaper no desplegado (vivo = base ML4W: la paleta se regenerará en CLARO)  → ./aplicar.sh"; status=1
 else
   echo "⚠  ML4W cambió ml4w-wallpaper  → revisar; re-incorporar el parche de run_matugen a overlay/ + refrescar baseline (./capturar-baseline.sh)"; status=1
+fi
+
+# 6e. hypridle.conf. Cuarto fichero de ML4W que sobrescribimos: los dos encendidos de pantalla
+#     pasan por despertar-pantallas.sh en vez de disparar `dpms enable` a ciegas. Si ML4W lo
+#     repone, vuelve el negro tras suspender (issue #1). Comprobación de 3 estados.
+hi_over="$ROOT/overlay/hypr/hypridle.conf"
+hi_base="$ROOT/baseline/hypr/hypridle.conf"
+hi_live="$LIVE/hypr/hypridle.conf"
+if [[ ! -f "$hi_live" ]]; then
+  echo "⤴  NO desplegado: hypr/hypridle.conf  → ./aplicar.sh"; status=1
+elif diff -q "$hi_over" "$hi_live" >/dev/null; then
+  :  # live == overlay → arreglo desplegado, OK
+elif [[ -f "$hi_base" ]] && diff -q "$hi_base" "$hi_live" >/dev/null; then
+  echo "⤴  hypridle.conf no desplegado (vivo = base ML4W: volverá el negro al reanudar)  → ./aplicar.sh"; status=1
+else
+  echo "⚠  ML4W cambió hypridle.conf  → revisar; re-incorporar el encendido robusto a overlay/ + refrescar baseline (./capturar-baseline.sh)"; status=1
+fi
+
+# 6f. hypridle tiene que estar corriendo, o no hay ni bloqueo ni suspensión ni reanudación.
+if ! pgrep -x hypridle >/dev/null; then
+  echo "⚠  hypridle NO está corriendo  → ./aplicar.sh"; status=1
 fi
 
 # 6c. Coherencia de la paleta: si el flag de gtk-3.0 dice oscuro pero colors.json salió claro,

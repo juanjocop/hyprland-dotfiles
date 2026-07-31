@@ -77,13 +77,22 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
   integrated Radeon iGPU, `amdgpu`) + **NVIDIA RTX 5070 Ti** (Blackwell, open kernel module
   driver `610.x`). The **monitors hang off the NVIDIA** (card1: DP-1 240Hz + DP-2); the AMD
   iGPU has nothing plugged in, so `amdgpu ... Cannot find any crtc or sizes` in the journal
-  is **benign noise**. The **black screen after the monitors slept was not** an NVIDIA modeset
-  quirk, as first assumed: Hyprland *died* with SIGSEGV inside aquamarine 0.13.0
-  (`SDRMConnector::releaseCommitBuffers`, expired weak pointer) when the DP link dropped and
-  NVIDIA reported it as a hotplug. Fixed upstream by `c0bd9ed`, shipped in **aquamarine 0.14.0**
-  (installed 2026-07-29); the temporary `hypridle.conf` mitigation was reverted 2026-07-31 —
-  full diagnosis in issue #1. Moral: if a black screen returns, check `coredumpctl` for a
-  Hyprland crash **before** blaming the driver.
+  is **benign noise**. The **black screen after the monitors slept is two separate bugs with the
+  same symptom** — don't conflate them; `coredumpctl list` tells them apart (full write-up in
+  `README.md` and issue #1):
+  - **Hyprland *dies*** → aquamarine 0.13.0 SIGSEGV in `SDRMConnector::releaseCommitBuffers`.
+    Fixed upstream by `c0bd9ed`, shipped in **aquamarine 0.14.0** (installed 2026-07-29).
+  - **Hyprland *survives*, screen still black** → the outputs stay disabled and nothing re-enables
+    them. Fingerprint: the session log has `enabledState changed true -> false` and **no**
+    `false -> true`. ML4W's stock `after_sleep_cmd` fires the dpms-enable once and blind, which
+    loses it (session not yet active on resume), and these monitors **drop the DP link ~6 s after
+    being turned off** and come back as a *new* monitor reporting `dpms=true` while the connector
+    is still disabled — so a plain enable is a **no-op**. Ours waits for the session and *cycles*
+    dpms with retries: `overlay/ml4w-juanjo/scripts/despertar-pantallas.sh`, wired in from our
+    `overlay/hypr/hypridle.conf`. Leaves a log in `~/.cache/ml4w-juanjo/`.
+
+  Moral: if a black screen returns, check `coredumpctl` **before** blaming the driver, and never
+  trust `hyprctl monitors` alone — after a DP reconnect its dpms state can lie.
 
 Common to both:
 

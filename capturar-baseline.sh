@@ -14,6 +14,7 @@ BASE=(
   fastfetch/config.jsonc
   ml4w/scripts/ml4w-toggle-hyprsunset
   ml4w/scripts/ml4w-wallpaper
+  hypr/hypridle.conf
 )
 
 for f in "${BASE[@]}"; do
