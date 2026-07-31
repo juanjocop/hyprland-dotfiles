@@ -67,9 +67,24 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
 
 ## Key facts about the target system
 
+**This overlay runs on two machines** (the same overlay is applied on both — see the
+`multi-equipo` commit). Hardware differs, so any hardware-specific detail below is tagged:
+
+- **Portátil (laptop)** — **Optimus**: Intel UHD 630 iGPU + NVIDIA GTX 1060 Mobile dGPU
+  (proprietary drivers). This is the machine most of the numbered docs were originally
+  written against.
+- **Sobremesa (desktop)**, hostname `cachyos-equipaso` — **AMD Ryzen 7 9800X3D** (has an
+  integrated Radeon iGPU, `amdgpu`) + **NVIDIA RTX 5070 Ti** (Blackwell, open kernel module
+  driver `610.x`). The **monitors hang off the NVIDIA** (card1: DP-1 240Hz + DP-2); the AMD
+  iGPU has nothing plugged in, so `amdgpu ... Cannot find any crtc or sizes` in the journal
+  is **benign noise**. Suspend/resume can leave a black screen — that's an NVIDIA modeset
+  resume issue, intermittent, not a dotfiles problem.
+
+Common to both:
+
 - CachyOS (Arch-based), Hyprland WM, **fish** shell. ML4W with the newer **Lua-based**
   Hyprland config.
-- **Hyprland 0.55 config is native Lua, and it breaks inherited intuition** — there is no
+- **Hyprland 0.56 config is native Lua, and it breaks inherited intuition** — there is no
   `hyprland.conf`, and `hyprctl dispatch` evaluates its argument as Lua
   (`hyprctl dispatch closewindow class:foo` errors; use
   `hyprctl dispatch 'hl.dsp.workspace.toggle_special("cava")'`). Also: `hl.dsp.*` only *builds*
@@ -78,7 +93,6 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
   validate fields, so `hyprctl eval` is a reliable bench for those (use a fake class).
   `~/.config/hypr/custom.lua` is ML4W's official hook, loaded last.
   **Full verified details in `00-contexto-y-hardware.md` — don't re-derive them.**
-- **Optimus** laptop: Intel UHD 630 iGPU + NVIDIA GTX 1060 Mobile dGPU (proprietary drivers).
 - ML4W tree lives at `~/.mydotfiles/com.ml4w.dotfiles.stable/.config/...`, symlinked into
   `~/.config/...`. Editing `~/.config/waybar/...` edits the ML4W tree. `~/.mydotfiles` is
   **not** a git repo.
@@ -89,9 +103,39 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
 
 ### Verified sensor commands (don't re-derive)
 
-- CPU temp (stable path — `hwmonN` is **not** stable across boots):
-  `hwmon-path-abs = /sys/devices/platform/coretemp.0/hwmon`, `input-filename = temp1_input`.
-- GPU temp: `nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits`.
+`hwmonN` is **not** stable across boots, so use the stable device path. **The CPU sensor
+differs per machine** (Intel `coretemp` vs AMD `k10temp`):
+
+- CPU temp — **laptop (Intel)**: `hwmon-path-abs = /sys/devices/platform/coretemp.0/hwmon`,
+  `input-filename = temp1_input`.
+- CPU temp — **sobremesa (AMD Ryzen 9800X3D, `k10temp`)**: stable device path
+  `/sys/devices/pci0000:00/0000:00:18.3/hwmon`, sensor label **Tctl** (`temp1_input`). There
+  is no `coretemp.0` on this machine — a config hardcoding the Intel path shows nothing here.
+- GPU temp (both): `nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits`.
+
+### kde-gtk-config rewrites GTK settings behind your back (don't re-derive)
+
+`kde-gtk-config` ships with CachyOS and fires whenever a KDE app starts — even though Plasma
+isn't the session. It rewrites `~/.config/gtk-{3.0,4.0}/settings.ini` (and
+`~/.config/xsettingsd/xsettingsd.conf`, same mtime to the second — that's how you fingerprint
+it) into **KDE's own format**. Verified 2026-07-31; it caused two separate appearance bugs:
+
+- `gtk-application-prefer-dark-theme`: `1` → `true`. ML4W's `run_matugen` compared it
+  **numerically**, so the test aborted and matugen regenerated the whole palette in **light**.
+  Fixed in `overlay/ml4w/scripts/ml4w-wallpaper` (accepts `1` and `true`, like ML4W's own
+  `gtk-theme-switcher.sh` already did).
+- `gtk-icon-theme-name`: `breeze-dark` → `breeze`. Tray icons (`nm-applet`) went near-black
+  (`#232629` vs `#fcfcfc`) on the dark bar. Fixed in `aplicar.sh` §5d + `check.sh` §6d.
+
+Two things worth knowing when debugging this class of bug:
+
+- **Tray icons are NOT styled by waybar CSS** — they come from the GTK icon theme. Waybar 0.15
+  has no `icon-theme` option on `tray` (only `hyprland-workspaces` and `wlr-taskbar` do), so
+  the fix is necessarily global. Don't chase `#network { color: … }`.
+- **Never overlay `settings.ini` whole**: it holds per-machine values (`gtk-xft-dpi`, cursor),
+  so a byte-for-byte overlay breaks the multi-machine invariant. Set only the key you own.
+
+`check.sh` §6c/§6d now detect both regressions, so the workflow catches a recurrence.
 
 ## Working rules
 
@@ -100,11 +144,14 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
 - After deploying, relaunch waybar via `~/.config/waybar/launch.sh` (not `SIGUSR2 waybar` —
   we're switching theme, not just reloading content) and validate the bar against the raw
   `sensors` / `nvidia-smi` output (see `02-tarea-temperaturas.md`).
-- **Optimus battery caveat**: polling `nvidia-smi` on an interval can keep the dGPU awake.
-  The GPU-in-battery behavior is an open decision — confirm with the user before committing
-  to a polling interval.
+- **Optimus battery caveat (laptop only)**: polling `nvidia-smi` on an interval can keep the
+  dGPU awake. The GPU-in-battery behavior is an open decision — confirm with the user before
+  committing to a polling interval. Moot on the desktop (no battery, NVIDIA always driving
+  the displays).
 
 ## Open decisions (ask the user)
 
-- GitHub repo visibility (public/private) and final name.
 - GPU module behavior on battery (see the caveat above).
+
+*(Resolved: the repo is public at `github.com/juanjocop/hyprland-dotfiles`, default branch
+`main`.)*

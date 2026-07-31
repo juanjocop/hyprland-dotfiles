@@ -240,6 +240,74 @@ Son decisiones, no descuidos. Están comentadas en el código; aquí el resumen:
 
 ---
 
+## Paleta clara tras un update
+
+**Síntoma:** un buen día el escritorio entero amanece en **claro** —waybar, bordes, rofi, GTK,
+swaync, btop y la franja de cava— sin haber tocado nada. `./check.sh` dice "todo en sync" porque
+nuestros ficheros siguen en su sitio: lo que cambió es la **paleta que genera matugen**.
+
+**Causa (verificada el 2026-07-31).** Es un bug de ML4W que dispara Plasma:
+
+1. `kde-gtk-config` (viene con CachyOS, se activa al arrancar cualquier app KDE) reescribe
+   `~/.config/gtk-3.0/settings.ini` en **su** formato y deja el flag de tema oscuro como
+   `gtk-application-prefer-dark-theme=`**`true`** en vez de `1`.
+2. `run_matugen()` de `ml4w/scripts/ml4w-wallpaper` lo leía con una comparación **numérica**:
+   `[ "$theme_pref" -eq 1 ]`. Con `true` eso aborta (*"se esperaba un entero"*), `mode` se queda
+   en su valor por defecto `light` y **matugen regenera toda la paleta en claro**.
+3. Con `wallpaper-automation` activo, la siguiente rotación de fondo lo propaga a todo.
+
+Es una **incoherencia interna de ML4W**: su propio listener `ml4w/listeners/gtk-theme-switcher.sh`
+sí acepta `1/true` y `0/false` explícitamente. Solo `run_matugen` se quedó con el test numérico.
+
+**Arreglo (en el overlay).** `overlay/ml4w/scripts/ml4w-wallpaper` sustituye esa línea por
+`case "$theme_pref" in 1 | true) mode="dark" ;; esac`, que acepta ambos formatos. Al ser un
+fichero de ML4W lleva baseline y comprobación de 3 estados en `check.sh` (§6b), más un chequeo
+de coherencia (§6c) que avisa si la paleta sale clara teniendo el tema oscuro pedido.
+
+Si te vuelve a pasar (p. ej. antes de re-aplicar tras un update de ML4W), regenerar es:
+
+```bash
+~/.config/ml4w/scripts/ml4w-wallpaper "$(cat ~/.cache/ml4w/hyprland-dotfiles/current_wallpaper)"
+```
+
+> ⚠️ **El toggle de tema de ML4W sigue roto por la misma causa** y no lo hemos parcheado.
+> `ml4w-toggle-theme` busca `=1` con `grep -q`; al encontrar `true` cae al `else` y hace
+> `sed 's/=0/=1/'`, que tampoco casa → imprime *"Switched to dark theme"* y **no cambia nada**.
+> Mientras el flag valga `true` no se puede pasar a claro desde la GUI. No nos molesta porque
+> queremos oscuro siempre; si algún día hace falta, se arregla poniendo el flag a mano a `0`.
+
+### El otro síntoma: iconos de bandeja negros
+
+**La misma escritura de kde-gtk-config** (30 jul, 13:59:51) cambió también
+`gtk-icon-theme-name` de **`breeze-dark`** a **`breeze`**. Son la variante oscura y la clara del
+mismo set: los trazos pasan de `#fcfcfc` a `#232629`. Sobre la barra oscura, el icono de
+`nm-applet` se volvió **negro y casi invisible**.
+
+Es fácil confundirlo con el módulo `network` de waybar, pero **no lo es**: el módulo (el glifo
+Font Awesome + `enp8s0`) se ve blanco y correcto. Lo que está negro es el icono de **bandeja**,
+que no pinta el CSS de waybar sino el **icon theme de GTK**. Por eso "parece que no está atado
+al theme" — es que literalmente no lo está.
+
+**Arreglo:** `aplicar.sh` (§5d) fija `gtk-icon-theme-name=breeze-dark` en `gtk-3.0` y `gtk-4.0`
+más `gsettings`, y `check.sh` (§6d) avisa si vuelve a una variante clara.
+
+Dos detalles del arreglo:
+
+- **Se fija solo esa clave, no el fichero entero.** `settings.ini` lleva valores **por máquina**
+  (`gtk-xft-dpi`, cursor…), así que un overlay byte a byte rompería el multi-equipo.
+- **Es global, no acotado a la barra.** Waybar 0.15 **no** tiene opción `icon-theme` en el módulo
+  `tray` (solo la tienen `hyprland-workspaces` y `wlr-taskbar`), así que no hay forma de tocar
+  únicamente los iconos de waybar. Como todo el escritorio es oscuro, `breeze-dark` es lo
+  coherente de todos modos — y es lo que el equipo ya tenía antes.
+
+> Los iconos de bandeja **no se recolorean solos**: hay que reiniciar la app que los sirve
+> (`nm-applet`). Tras `./aplicar.sh`, o cierras sesión, o:
+> `pkill -f nm-applet; hyprctl dispatch 'hl.dsp.exec_cmd("nm-applet --indicator")'`
+> (lanzado desde un shell suelto se muere con el padre; por eso va vía Hyprland). Al
+> re-registrarse aparece al final de la bandeja; en el siguiente login recupera su orden.
+
+---
+
 ## Estructura del repo
 
 ```
@@ -253,6 +321,8 @@ overlay/                     ← fuente de verdad: solo lo que personalizamos
   ml4w-juanjo/scripts/cava-toggle.sh toggle de ambos modos (tile|bg) + exclusión mutua
   fastfetch/config.jsonc             config con el glob del logo
   fastfetch/logos/*.png              conjunto de logos para la rotación
+  ml4w/scripts/ml4w-toggle-hyprsunset  shim: delega el toggle en nightlight.sh
+  ml4w/scripts/ml4w-wallpaper          parche: matugen en oscuro aunque el flag diga `true`
 baseline/                    ← copia "virgen" de la base de ML4W (para detectar deriva)
 aplicar.sh · check.sh · capturar-baseline.sh
 00-…03-*.md · CLAUDE.md      ← contexto, decisiones y notas de diseño

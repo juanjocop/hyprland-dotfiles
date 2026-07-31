@@ -90,6 +90,38 @@ else
   echo "⚠  ML4W cambió ml4w-toggle-hyprsunset  → revisar; re-incorporar el shim a overlay/ + refrescar baseline (./capturar-baseline.sh)"; status=1
 fi
 
+# 6b. ml4w-wallpaper. Tercer fichero de ML4W que sobrescribimos: parcheamos run_matugen para
+#     que acepte `true` además de `1` en el flag de tema oscuro de gtk-3.0/settings.ini.
+#     Sin el parche, en cuanto kde-gtk-config reescriba ese flag como `true` la siguiente
+#     rotación de fondo regenera TODA la paleta en claro. Comprobación de 3 estados.
+wp_over="$ROOT/overlay/ml4w/scripts/ml4w-wallpaper"
+wp_base="$ROOT/baseline/ml4w/scripts/ml4w-wallpaper"
+wp_live="$LIVE/ml4w/scripts/ml4w-wallpaper"
+if [[ ! -f "$wp_live" ]]; then
+  echo "⤴  NO desplegado: ml4w/scripts/ml4w-wallpaper  → ./aplicar.sh"; status=1
+elif diff -q "$wp_over" "$wp_live" >/dev/null; then
+  :  # live == overlay → parche desplegado, OK
+elif [[ -f "$wp_base" ]] && diff -q "$wp_base" "$wp_live" >/dev/null; then
+  echo "⤴  ml4w-wallpaper no desplegado (vivo = base ML4W: la paleta se regenerará en CLARO)  → ./aplicar.sh"; status=1
+else
+  echo "⚠  ML4W cambió ml4w-wallpaper  → revisar; re-incorporar el parche de run_matugen a overlay/ + refrescar baseline (./capturar-baseline.sh)"; status=1
+fi
+
+# 6c. Coherencia de la paleta: si el flag de gtk-3.0 dice oscuro pero colors.json salió claro,
+#     es que corrió un ml4w-wallpaper sin parchear. Se detecta por la luminosidad del fondo.
+gtk_pref=$(grep -E '^gtk-application-prefer-dark-theme=' "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null | awk -F'=' '{print $2}')
+bg=$(grep -oP '"background":\s*"#\K[0-9a-fA-F]{6}' "$HOME/.config/ml4w/colors/colors.json" 2>/dev/null | head -1)
+if [[ "$gtk_pref" =~ ^(1|true)$ && -n "$bg" ]] && (( 16#${bg:0:2} + 16#${bg:2:2} + 16#${bg:4:2} > 382 )); then
+  echo "⚠  paleta CLARA (#$bg) con el tema oscuro pedido  → regenerar: ~/.config/ml4w/scripts/ml4w-wallpaper \"\$(cat ~/.cache/ml4w/hyprland-dotfiles/current_wallpaper)\""; status=1
+fi
+
+# 6d. Icon theme de GTK. Misma escritura de kde-gtk-config que rompe la paleta lo revierte a la
+#     variante CLARA → los iconos de bandeja (nm-applet) se ven negros sobre la barra oscura.
+icon_theme=$(grep -E '^gtk-icon-theme-name=' "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null | cut -d= -f2)
+if [[ -n "$icon_theme" && "${icon_theme,,}" != *-dark ]]; then
+  echo "⚠  icon theme GTK = '$icon_theme' (variante clara → iconos de bandeja negros)  → ./aplicar.sh"; status=1
+fi
+
 # Carpeta de logos: debe existir y tener ≥1 PNG, o el glob no casa y no habría imagen.
 logos_dir="$LIVE/ml4w-juanjo/fastfetch-logos"
 if ! compgen -G "$logos_dir/*.png" >/dev/null; then
