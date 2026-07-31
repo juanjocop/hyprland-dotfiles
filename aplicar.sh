@@ -36,6 +36,31 @@ systemctl --user restart hyprsunset.service       # recargar con el nuevo config
 cp -f "$ROOT/overlay/ml4w/scripts/ml4w-toggle-hyprsunset" "$DEST/ml4w/scripts/ml4w-toggle-hyprsunset"
 chmod +x "$DEST/ml4w/scripts/ml4w-toggle-hyprsunset"
 
+# 5c. Otro fichero de ML4W que sustituimos: ml4w-wallpaper. Su run_matugen decidía claro/oscuro
+#     con una comparación NUMÉRICA contra el flag de gtk-3.0/settings.ini, y kde-gtk-config
+#     (Plasma, viene con CachyOS) reescribe ese fichero dejando `true` en vez de `1` → el test
+#     petaba y matugen regeneraba la paleta entera en CLARO. Nuestra copia acepta 1 y true.
+cp -f "$ROOT/overlay/ml4w/scripts/ml4w-wallpaper" "$DEST/ml4w/scripts/ml4w-wallpaper"
+chmod +x "$DEST/ml4w/scripts/ml4w-wallpaper"
+
+# 5d. Icon theme de GTK. Los iconos de BANDEJA (nm-applet, blueman) no los pinta el CSS de
+#     waybar: los sirve el icon theme de GTK. kde-gtk-config lo revierte a `breeze`, la variante
+#     CLARA (trazos #232629) → iconos negros sobre la barra oscura. `breeze-dark` usa #fcfcfc.
+#     No overlayeamos settings.ini entero porque lleva valores POR MÁQUINA (gtk-xft-dpi, cursor),
+#     así que fijamos solo la clave. Waybar 0.15 no tiene `icon-theme` en el módulo tray, por eso
+#     el arreglo es global y no acotado a la barra.
+ICON_THEME="breeze-dark"
+for gtkver in 3.0 4.0; do
+  ini="$DEST/gtk-$gtkver/settings.ini"
+  [[ -f "$ini" ]] || continue
+  if grep -q '^gtk-icon-theme-name=' "$ini"; then
+    sed -i "s/^gtk-icon-theme-name=.*/gtk-icon-theme-name=$ICON_THEME/" "$ini"
+  else
+    sed -i "/^\[Settings\]/a gtk-icon-theme-name=$ICON_THEME" "$ini"
+  fi
+done
+gsettings set org.gnome.desktop.interface icon-theme "$ICON_THEME" 2>/dev/null || true
+
 # 6. Fastfetch: logo rotativo. Desplegar nuestro config (fichero de ML4W → symlink al árbol,
 #    se re-aplica tras cada update) y sincronizar las imágenes a un namespace propio fuera de
 #    ML4W (~/.config/ml4w-juanjo/), que el updater nunca poda. fastfetch elige un PNG al azar
