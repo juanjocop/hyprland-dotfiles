@@ -264,6 +264,13 @@ sí acepta `1/true` y `0/false` explícitamente. Solo `run_matugen` se quedó co
 fichero de ML4W lleva baseline y comprobación de 3 estados en `check.sh` (§6b), más un chequeo
 de coherencia (§6c) que avisa si la paleta sale clara teniendo el tema oscuro pedido.
 
+**Reportado en upstream** ([ML4W #1765](https://github.com/mylinuxforwork/dotfiles/issues/1765)),
+donde [PR #1759](https://github.com/mylinuxforwork/dotfiles/pull/1759) ya lo arregla en origen.
+Cuando la mergeen, **este parche sobra y hay que retirarlo** del overlay o `check.sh` avisará de
+deriva para siempre — seguimiento en la
+[issue #3](https://github.com/juanjocop/hyprland-dotfiles/issues/3), con el comando para saber
+cuándo toca y los pasos exactos.
+
 Si te vuelve a pasar (p. ej. antes de re-aplicar tras un update de ML4W), regenerar es:
 
 ```bash
