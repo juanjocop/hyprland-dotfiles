@@ -69,6 +69,7 @@ selector— y poner vídeos en la carpeta si se quiere el fondo de vídeo.
 | **Luz nocturna (hyprsunset)** | Filtro de luz azul automático por horario **21:00 → 07:00** (4000 K) | `overlay/hypr/hyprsunset.conf` + systemd |
 | **Fastfetch: logo rotativo** | Muestra una imagen distinta al azar en cada arranque de terminal | `overlay/fastfetch/` |
 | **Visualizador de audio (cava)** | Barras al ritmo, en dos modos excluyentes: ventana (**SUPER+SHIFT+C**) y fondo (**SUPER+ALT+C**) | `overlay/cava/` + `overlay/ml4w-juanjo/` + `overlay/hypr/custom.lua` |
+| **Encendido robusto al reanudar** | Evita la pantalla en negro tras suspender: espera a que la sesión esté activa y **cicla** el DPMS con reintentos | `overlay/ml4w-juanjo/scripts/despertar-pantallas.sh` + `overlay/hypr/hypridle.conf` |
 
 ---
 
@@ -315,6 +316,48 @@ Dos detalles del arreglo:
 
 ---
 
+## Pantalla en negro tras suspender (sobremesa)
+
+Han sido **dos fallos distintos con el mismo síntoma**, y confundirlos costó una semana. Si vuelve
+el negro, la primera pregunta es siempre **`coredumpctl list`**: dice cuál de los dos es.
+
+**1. Hyprland MUERE → era aquamarine 0.13.0.** SIGSEGV en `SDRMConnector::releaseCommitBuffers`
+al caducar un weak pointer. Arreglado en upstream por `c0bd9ed`, publicado en **aquamarine
+0.14.0**. Ya no debería volver; se comprueba con:
+
+```bash
+grep -qa releaseStashedCommit /usr/lib/libaquamarine.so && echo "con el bug" || echo "arreglado"
+```
+
+**2. Hyprland SIGUE VIVO → es lo que arregla este overlay.** No hay coredump, los monitores se
+detectan bien y aun así la pantalla está negra. El rastro está en el log de la sesión:
+
+```bash
+grep "enabledState changed" /run/user/1000/hypr/$HYPRLAND_INSTANCE_SIGNATURE/hyprland.log
+```
+
+Si solo hay `true -> false` y ningún `false -> true`, es este: los outputs se quedaron
+deshabilitados y **nadie los volvió a encender**.
+
+La línea de serie de ML4W dispara el encendido **una vez y a ciegas**, y aquí eso no basta por
+dos motivos:
+
+- **Carrera.** `after_sleep_cmd` salta con `PrepareForSleep(false)`, cuando la sesión de logind
+  aún no se ha reactivado. aquamarine contesta `Session inactive` y el encendido se pierde.
+- **Estado que miente.** Estos monitores **tiran el enlace DisplayPort a los ~6 s** de apagarse
+  (verificado: DP-1 desaparece de `hyprctl monitors` y reaparece solo). Al reconectar se recrean
+  como monitor nuevo con `dpms=true`, mientras el conector sigue deshabilitado por debajo →
+  `dpms enable` se convierte en un **no-op**.
+
+Por eso `despertar-pantallas.sh` **espera** a que la sesión esté activa y luego **cicla** el DPMS
+(apagar + encender) con reintentos, en vez de solo encender. El ciclo es incondicional a
+propósito: consultar el estado y decidir "ya están bien" sería caer justo en el segundo motivo.
+
+Deja rastro en `~/.cache/ml4w-juanjo/despertar-pantallas.log`, que es lo primero que hay que
+mirar si el negro reaparece.
+
+---
+
 ## Estructura del repo
 
 ```
@@ -326,6 +369,8 @@ overlay/                     ← fuente de verdad: solo lo que personalizamos
   ml4w-juanjo/cava-bg/cava-raw.conf  cava del modo fondo (salida raw para el QML)
   ml4w-juanjo/quickshell/cavabg/     widget del fondo (franja + colores de matugen)
   ml4w-juanjo/scripts/cava-toggle.sh toggle de ambos modos (tile|bg) + exclusión mutua
+  ml4w-juanjo/scripts/despertar-pantallas.sh  encendido robusto de pantallas al reanudar
+  hypr/hypridle.conf                 igual que la de ML4W salvo los dos encendidos de pantalla
   fastfetch/config.jsonc             config con el glob del logo
   fastfetch/logos/*.png              conjunto de logos para la rotación
   ml4w/scripts/ml4w-toggle-hyprsunset  shim: delega el toggle en nightlight.sh

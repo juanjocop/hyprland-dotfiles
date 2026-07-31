@@ -92,6 +92,24 @@ cp -f "$ROOT/overlay/ml4w-juanjo/scripts/cava-toggle.sh" "$DEST/ml4w-juanjo/scri
 chmod +x "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
 cp -f "$ROOT/overlay/hypr/custom.lua" "$DEST/hypr/custom.lua"
 
+# 8b. Encendido robusto de pantallas al reanudar. Dos piezas:
+#     - el script, a nuestro namespace (~/.config/ml4w-juanjo/) → el updater nunca lo poda.
+#     - hypridle.conf, que SÍ es fichero de ML4W (~/.config/hypr es symlink a su árbol) → se
+#       repone en cada update, por eso check.sh lo vigila a 3 estados.
+#     El motivo: la línea de serie disparaba `dpms enable` una sola vez y a ciegas justo al
+#     despertar, y dejaba la pantalla en negro (issue #1). Ver cabecera del script.
+cp -f "$ROOT/overlay/ml4w-juanjo/scripts/despertar-pantallas.sh" \
+      "$DEST/ml4w-juanjo/scripts/despertar-pantallas.sh"
+chmod +x "$DEST/ml4w-juanjo/scripts/despertar-pantallas.sh"
+cp -f "$ROOT/overlay/hypr/hypridle.conf" "$DEST/hypr/hypridle.conf"
+# Relanzar hypridle para que lea el config nuevo, pero SOLO si ya estaba corriendo: aplicar.sh
+# también debe poder ejecutarse desde un TTY sin sesión, y ahí no queremos dejar uno suelto.
+if pgrep -x hypridle >/dev/null; then
+  pkill -x hypridle || true
+  sleep 1
+  setsid hypridle >/dev/null 2>&1 < /dev/null &
+fi
+
 # 9. Recargar Hyprland para que entren custom.lua (los binds de cava) y las variantes de
 #    decoración. Imprescindible en un equipo NUEVO: allí custom.lua no existía, y ML4W solo hace
 #    require("custom") si el fichero está — sin recarga los binds no se registran (verificado).
