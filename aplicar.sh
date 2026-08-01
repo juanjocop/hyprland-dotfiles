@@ -92,15 +92,23 @@ cp -f "$ROOT/overlay/ml4w-juanjo/scripts/cava-toggle.sh" "$DEST/ml4w-juanjo/scri
 chmod +x "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
 cp -f "$ROOT/overlay/hypr/custom.lua" "$DEST/hypr/custom.lua"
 
-# 8b. Encendido robusto de pantallas al reanudar. Dos piezas:
-#     - el script, a nuestro namespace (~/.config/ml4w-juanjo/) → el updater nunca lo poda.
+# 8b. Todo lo que cuelga de hypridle. Tres piezas:
+#     - despertar-pantallas.sh: encendido robusto al reanudar. La línea de serie disparaba
+#       `dpms enable` una sola vez y a ciegas, y dejaba la pantalla en negro (issue #1).
+#     - idle-guard.sh: guardián de la inactividad. Los on-timeout de bloqueo, apagado de
+#       pantallas y suspensión pasan por él, para poder desactivarlos por separado desde el botón
+#       de la barra sin tocar el config ni reiniciar el daemon. Ver cabecera del script.
 #     - hypridle.conf, que SÍ es fichero de ML4W (~/.config/hypr es symlink a su árbol) → se
 #       repone en cada update, por eso check.sh lo vigila a 3 estados.
-#     El motivo: la línea de serie disparaba `dpms enable` una sola vez y a ciegas justo al
-#     despertar, y dejaba la pantalla en negro (issue #1). Ver cabecera del script.
+#     Los dos scripts van a nuestro namespace (~/.config/ml4w-juanjo/) → el updater nunca los
+#     poda. El guardián NO va con los scripts del theme a propósito: hypridle depende de él y no
+#     debe romperse si algún día se cambia de theme de waybar.
 cp -f "$ROOT/overlay/ml4w-juanjo/scripts/despertar-pantallas.sh" \
       "$DEST/ml4w-juanjo/scripts/despertar-pantallas.sh"
 chmod +x "$DEST/ml4w-juanjo/scripts/despertar-pantallas.sh"
+cp -f "$ROOT/overlay/ml4w-juanjo/scripts/idle-guard.sh" \
+      "$DEST/ml4w-juanjo/scripts/idle-guard.sh"
+chmod +x "$DEST/ml4w-juanjo/scripts/idle-guard.sh"
 cp -f "$ROOT/overlay/hypr/hypridle.conf" "$DEST/hypr/hypridle.conf"
 # Relanzar hypridle para que lea el config nuevo, pero SOLO si ya estaba corriendo: aplicar.sh
 # también debe poder ejecutarse desde un TTY sin sesión, y ahí no queremos dejar uno suelto.
@@ -116,4 +124,4 @@ fi
 #    `|| true`: aplicar.sh también debe poder correrse sin sesión de Hyprland viva (p. ej. TTY).
 hyprctl reload >/dev/null 2>&1 || true
 
-echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00 + botón manual; fastfetch con logo aleatorio; variante decoración 'Juanjo' disponible en Appearance; cava en SUPER+SHIFT+C)."
+echo "✔  Overlay aplicado (theme $THEME activo; hyprsunset con horario 21:00→07:00 + botón manual; fastfetch con logo aleatorio; variante decoración 'Juanjo' disponible en Appearance; cava en SUPER+SHIFT+C; control de inactividad en el botón 󰅶 de la barra)."

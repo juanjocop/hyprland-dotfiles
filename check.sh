@@ -27,6 +27,7 @@ OURS=(
   ml4w-juanjo/quickshell/cavabg/shell.qml
   ml4w-juanjo/scripts/cava-toggle.sh
   ml4w-juanjo/scripts/despertar-pantallas.sh
+  ml4w-juanjo/scripts/idle-guard.sh
   hypr/custom.lua
 )
 for f in "${OURS[@]}"; do
@@ -127,6 +128,18 @@ fi
 # 6f. hypridle tiene que estar corriendo, o no hay ni bloqueo ni suspensión ni reanudación.
 if ! pgrep -x hypridle >/dev/null; then
   echo "⚠  hypridle NO está corriendo  → ./aplicar.sh"; status=1
+fi
+
+# 6g. Estado del guardián de inactividad. NO es un fallo (desactivar la suspensión es justo para
+#     lo que está el botón), pero conviene recordarlo: si te dejaste la suspensión desactivada,
+#     este es el sitio donde se entera uno. Se limpia solo al cerrar sesión (vive en tmpfs).
+idle_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ml4w-juanjo/inactividad"
+idle_off=()
+for f in pantallas bloqueo suspension; do
+  [[ -f "$idle_dir/$f" ]] && idle_off+=("$f")
+done
+if (( ${#idle_off[@]} > 0 )); then
+  echo "ℹ  inactividad DESACTIVADA para: ${idle_off[*]}  → botón 󰅶 de la barra, o cerrar sesión"
 fi
 
 # 6c. Coherencia de la paleta: si el flag de gtk-3.0 dice oscuro pero colors.json salió claro,

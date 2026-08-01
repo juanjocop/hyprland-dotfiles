@@ -70,6 +70,7 @@ selector— y poner vídeos en la carpeta si se quiere el fondo de vídeo.
 | **Fastfetch: logo rotativo** | Muestra una imagen distinta al azar en cada arranque de terminal | `overlay/fastfetch/` |
 | **Visualizador de audio (cava)** | Barras al ritmo, en dos modos excluyentes: ventana (**SUPER+SHIFT+C**) y fondo (**SUPER+ALT+C**) | `overlay/cava/` + `overlay/ml4w-juanjo/` + `overlay/hypr/custom.lua` |
 | **Encendido robusto al reanudar** | Evita la pantalla en negro tras suspender: espera a que la sesión esté activa y **cicla** el DPMS con reintentos | `overlay/ml4w-juanjo/scripts/despertar-pantallas.sh` + `overlay/hypr/hypridle.conf` |
+| **Control de inactividad** | Botón 󰅶 desplegable en la barra: desactiva por separado el **bloqueo**, el **apagado de pantallas** y la **suspensión** (para dejar algo trabajando solo) | `overlay/ml4w-juanjo/scripts/idle-guard.sh` + `overlay/hypr/hypridle.conf` |
 
 ---
 
@@ -358,6 +359,82 @@ mirar si el negro reaparece.
 
 ---
 
+## Control de inactividad (el botón 󰅶 de la barra)
+
+Para dejar algo trabajando solo —una IA en una terminal, una compilación larga— sin que el equipo
+se pare. Un grupo desplegable en la barra con tres interruptores independientes:
+
+| Interruptor | Desactiva | ¿Detiene lo que esté trabajando? |
+|---|---|---|
+| 󰌾 **Bloqueo** | el `loginctl lock-session` de los 10 min | **No** — solo tapa la pantalla |
+| 󰍹 **Pantallas** | el apagado de pantallas de los 11 min | **No** — solo apaga la salida de vídeo |
+| 󰤄 **Suspensión** | el `systemctl suspend` de los 30 min | **Sí**: suspender **congela todos los procesos** |
+
+Los **tres interruptores** siguen la convención del resto de botones de la barra (fondo de vídeo,
+luz nocturna): **coloreado = esa función funciona**, atenuado = la has desactivado tú.
+
+El **ancla** (󰅶) resume el estado y con un clic los alterna todos a la vez. **Va al revés que sus
+hijos, a propósito**: su icono es un **café**, y un café no representa "el bloqueo funciona" sino
+**cafeína**. Se lee solo, y destaca justo el estado del que conviene no olvidarse:
+
+| Ancla | Significado |
+|---|---|
+| `@primary` (coloreada) | **Café ON**: los tres desactivados, el equipo no hará nada solo |
+| `@secondary` | Café a medias: has desactivado **alguno** de los tres |
+| Atenuada | Café OFF: todo normal — se bloqueará, apagará pantallas y suspenderá |
+
+Los tooltips lo dicen con todas las letras (*"Café ON"* / *"Café OFF"*) por si la doble lectura
+despista.
+
+**Lo que de verdad hace falta desactivar es la suspensión.** Bloquear la sesión o apagar las
+pantallas no para nada; solo molestan si quieres vigilar el progreso de un vistazo. Ojo con
+confundir bloquear con **cerrar sesión**: cerrar sesión sí mata los procesos de la sesión.
+
+### Por qué un guardián y no un inhibidor
+
+Nada de esto se puede hacer en caliente con hypridle (verificado, no re-derivar):
+
+- **hypridle 0.1.8 no tiene IPC.** No hay socket de control: no se puede activar ni desactivar un
+  listener sin reescribir el config y relanzar el daemon — y **relanzarlo reinicia el contador de
+  inactividad**. `ignore_inhibit` existe, pero es estático y por listener.
+- **Los inhibidores estándar son globales.** `systemd-inhibit --what=idle` frena todos los
+  listeners de golpe: justo la granularidad todo-o-nada que queremos evitar.
+- **Reescribir el `hypridle.conf` vivo** rompería la igualdad byte a byte overlay ↔ vivo de
+  `check.sh` (§6e).
+
+Como el overlay ya es dueño de `hypridle.conf`, la solución es la **indirección**: los `on-timeout`
+llaman a `idle-guard.sh`, que **en el momento del disparo** mira una bandera y decide si ejecuta la
+acción o la ignora. Config estático, daemon intacto, granularidad libre.
+
+Las banderas son ficheros vacíos en `$XDG_RUNTIME_DIR/ml4w-juanjo/inactividad/` — **tmpfs a
+propósito: la inhibición se limpia sola al cerrar sesión o reiniciar.** Nada de `~/.cache`:
+dejarse el equipo sin suspender "para siempre" sin recordarlo es justo el fallo que no queremos.
+`check.sh` (§6g) recuerda con un `ℹ` qué hay desactivado, sin tratarlo como error.
+
+### El parpadeo que hay que evitar
+
+El `on-resume` del listener de 11 min salta al mover el ratón **aunque las pantallas nunca se
+hayan apagado**, y `despertar-pantallas.sh` **cicla el DPMS de forma incondicional** (por diseño,
+ver su cabecera). Sin más, desactivar el apagado de pantallas habría provocado un **parpadeo cada
+vez que vuelves al equipo**. Por eso el guardián deja una marca `pantallas-apagadas` al apagar y
+solo llama a `despertar-pantallas.sh` si esa marca existe. El `$SELLO` de aquel script no cubre
+este caso: deduplica dos encendidos seguidos, no un encendido sin apagado previo.
+
+### Dos comportamientos que no son bugs
+
+1. **hypridle no reintenta un timeout ya vencido.** Si a los 30 min se ignora la suspensión y
+   luego reactivas el interruptor sin tocar el equipo, no se suspenderá hasta el siguiente ciclo
+   (mover ratón/teclado y volver a estar 30 min inactivo). Es el comportamiento seguro.
+2. **Las tres omisiones quedan en el log**, `~/.cache/ml4w-juanjo/idle-guard.log`. Es lo que
+   contesta a "¿por qué no se ha suspendido?".
+
+> ⚠️ **No uses el botón `custom/hypridle` de ML4W** (el que sale dentro de `group/tools`). Hace
+> `killall hypridle`, o sea se lleva por delante también el `after_sleep_cmd` que arregla la
+> pantalla en negro al reanudar. No se puede quitar de la barra sin editar el `modules.json`
+> compartido de ML4W, cosa que este overlay no hace por principio.
+
+---
+
 ## Estructura del repo
 
 ```
@@ -370,7 +447,8 @@ overlay/                     ← fuente de verdad: solo lo que personalizamos
   ml4w-juanjo/quickshell/cavabg/     widget del fondo (franja + colores de matugen)
   ml4w-juanjo/scripts/cava-toggle.sh toggle de ambos modos (tile|bg) + exclusión mutua
   ml4w-juanjo/scripts/despertar-pantallas.sh  encendido robusto de pantallas al reanudar
-  hypr/hypridle.conf                 igual que la de ML4W salvo los dos encendidos de pantalla
+  ml4w-juanjo/scripts/idle-guard.sh  guardián: decide si bloquear/apagar/suspender o ignorarlo
+  hypr/hypridle.conf                 igual que la de ML4W salvo el encendido robusto y el guardián
   fastfetch/config.jsonc             config con el glob del logo
   fastfetch/logos/*.png              conjunto de logos para la rotación
   ml4w/scripts/ml4w-toggle-hyprsunset  shim: delega el toggle en nightlight.sh

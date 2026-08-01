@@ -248,6 +248,42 @@ window#waybar.empty #window {
 }
 
 /* -----------------------------------------------------
+ * Control de inactividad (grupo desplegable)
+ * ----------------------------------------------------- */
+
+#custom-inactividad,
+#custom-idle-pantallas,
+#custom-idle-bloqueo,
+#custom-idle-suspension {
+    font-size: 15px;
+    padding: 0px 6px;
+}
+
+/* Los HIJOS siguen la convención del fondo de vídeo y la luz nocturna: coloreado = esa función
+   FUNCIONA (el equipo se bloqueará / apagará pantallas / suspenderá), atenuado = desactivada.
+   El ANCLA va al revés porque su icono es un café: coloreado = cafeína ON = los tres
+   desactivados. Quién emite cada clase es idle-guard.sh; aquí solo se pintan. */
+#custom-inactividad.active,
+#custom-idle-pantallas.active,
+#custom-idle-bloqueo.active,
+#custom-idle-suspension.active {
+    color: @primary;
+}
+
+/* Solo el ancla: algunos interruptores desactivados y otros no. */
+#custom-inactividad.parcial {
+    color: @secondary;
+}
+
+#custom-inactividad.inactive,
+#custom-idle-pantallas.inactive,
+#custom-idle-bloqueo.inactive,
+#custom-idle-suspension.inactive {
+    color: @on_surface;
+    opacity: 0.45;
+}
+
+/* -----------------------------------------------------
  * Custom Notification
  * ----------------------------------------------------- */
 
