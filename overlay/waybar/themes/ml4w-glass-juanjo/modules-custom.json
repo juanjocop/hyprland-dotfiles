@@ -48,5 +48,74 @@
         "tooltip": true,
         "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/nightlight.sh toggle",
         "on-click-right": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/nightlight.sh schedule"
+    },
+    // ── Control de inactividad ────────────────────────────────────────────────────────────────
+    // Grupo desplegable: un icono visible (ancla) y, al pasar el ratón, tres interruptores para
+    // desactivar por separado el bloqueo, el apagado de pantallas y la suspensión. Sirve para
+    // dejar algo trabajando solo sin que el equipo se suspenda (una suspensión CONGELA los
+    // procesos; bloquear o apagar pantallas no detiene nada).
+    //
+    // El script vive en ~/.config/ml4w-juanjo/ y NO aquí dentro, porque hypridle.conf también
+    // depende de él: no debe romperse si algún día se cambia de theme de waybar.
+    //
+    // ⚠ El botón `custom/hypridle` que ML4W mete en `group/tools` hace lo mismo a lo bruto
+    // (killall hypridle) y NO debe usarse: se lleva por delante el after_sleep_cmd que arregla la
+    // pantalla en negro al reanudar. No se puede quitar sin editar el modules.json compartido de
+    // ML4W, cosa que este overlay no hace.
+    "group/inactividad": {
+        "orientation": "inherit",
+        "drawer": {
+            "transition-duration": 300,
+            "children-class": "inactividad-hijo",
+            "transition-left-to-right": false
+        },
+        "modules": [
+            "custom/inactividad",
+            "custom/idle-pantallas",
+            "custom/idle-bloqueo",
+            "custom/idle-suspension"
+        ]
+    },
+    // Ancla del grupo: resume el estado (nada / algo / todo desactivado) y con un clic alterna
+    // los tres a la vez ("modo trabajo en curso"). Mismo glifo en los tres estados, solo cambia
+    // el color: si cambiase el icono bailaría el ancho de la barra.
+    "custom/inactividad": {
+        "exec": "~/.config/ml4w-juanjo/scripts/idle-guard.sh estado maestro",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 10,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/ml4w-juanjo/scripts/idle-guard.sh alternar maestro"
+    },
+    // Los tres interruptores. interval "once" (no sondeo, como livewallpaper): el estado solo
+    // cambia con nuestros clics. La señal 10 la comparten los cuatro módulos, así que al pulsar
+    // cualquiera se refrescan también el ancla y sus hermanos.
+    "custom/idle-pantallas": {
+        "exec": "~/.config/ml4w-juanjo/scripts/idle-guard.sh estado pantallas",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 10,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/ml4w-juanjo/scripts/idle-guard.sh alternar pantallas"
+    },
+    "custom/idle-bloqueo": {
+        "exec": "~/.config/ml4w-juanjo/scripts/idle-guard.sh estado bloqueo",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 10,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/ml4w-juanjo/scripts/idle-guard.sh alternar bloqueo"
+    },
+    "custom/idle-suspension": {
+        "exec": "~/.config/ml4w-juanjo/scripts/idle-guard.sh estado suspension",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 10,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/ml4w-juanjo/scripts/idle-guard.sh alternar suspension"
     }
 }
