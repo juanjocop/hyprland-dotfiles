@@ -24,7 +24,7 @@ ni plantillas:
 |---|---|
 | Sensor de CPU (`coretemp` ↔ `k10temp`) | `scripts/cputemp.sh` busca el hwmon por **nombre** |
 | Dirección PCI y modelo de la GPU | `scripts/gputemp.sh` los saca de `lspci` y de `nvidia-smi` |
-| Qué monitor usa el fondo de vídeo | `scripts/livewallpaper.sh` toma el monitor **enfocado** |
+| Cuántas pantallas tienen fondo de vídeo | `scripts/livewallpaper.sh` da **un botón por monitor**; el 2º se oculta si no hay |
 | Sin batería en el sobremesa | waybar descarta el módulo solo si no hay ninguna |
 
 Así se mantiene intacta la regla de oro (*el vivo es una copia byte a byte del overlay*) y
@@ -35,10 +35,16 @@ Así se mantiene intacta la regla de oro (*el vivo es una copia byte a byte del 
 
 ```bash
 # ~/.config/ml4w-juanjo/local.env
-LIVE_WALLPAPER_MONITOR=DP-1                    # si no, el monitor enfocado
+LIVE_WALLPAPER_MONITOR=DP-1                    # botón 1; si no, el primer monitor por id
+LIVE_WALLPAPER_MONITOR_2=DP-2                  # botón 2; normalmente sobra (lo detecta solo)
 LIVE_WALLPAPER_FOLDER=$HOME/Vídeos/hidamari    # carpeta de vídeos del fondo
 LIVE_WALLPAPER_INTERVAL=300                    # segundos entre vídeos
 ```
+
+> El **botón 2** coge por su cuenta el otro monitor conectado, así que `LIVE_WALLPAPER_MONITOR_2`
+> solo hace falta con tres pantallas o para forzar un reparto concreto. El orden es por `id` de
+> Hyprland y **no** por el foco: con dos pantallas el foco se mueve entre que waybar lee el estado
+> y que pulsas, y los dos botones se intercambiarían la identidad.
 
 > ⚠️ **La ruta distingue mayúsculas.** Si el botón dice *"Sin vídeos en …"* teniendo vídeos, casi
 > seguro es eso: `Hidamari` y `hidamari` son carpetas distintas. El aviso imprime la ruta exacta
@@ -65,7 +71,7 @@ selector— y poner vídeos en la carpeta si se quiere el fondo de vídeo.
 | Personalización | Qué hace | Dónde |
 |---|---|---|
 | **Waybar: temperaturas** | Temp de CPU y GPU (Optimus: Intel iGPU + NVIDIA dGPU) en la barra | theme propio `ml4w-glass-juanjo` |
-| **Waybar: botón fondo de vídeo** | Enciende/apaga un fondo de vídeo (mpvpaper) desde un botón de la barra | `scripts/livewallpaper.sh` |
+| **Waybar: botones de fondo de vídeo** | Un botón por pantalla (`󰕧¹` `󰕧²`) que enciende/apaga un fondo de vídeo (mpvpaper) en **cada monitor por separado** | `scripts/livewallpaper.sh` |
 | **Luz nocturna (hyprsunset)** | Filtro de luz azul automático por horario **21:00 → 07:00** (4000 K) | `overlay/hypr/hyprsunset.conf` + systemd |
 | **Fastfetch: logo rotativo** | Muestra una imagen distinta al azar en cada arranque de terminal | `overlay/fastfetch/` |
 | **Visualizador de audio (cava)** | Barras al ritmo, en dos modos excluyentes: ventana (**SUPER+SHIFT+C**) y fondo (**SUPER+ALT+C**) | `overlay/cava/` + `overlay/ml4w-juanjo/` + `overlay/hypr/custom.lua` |

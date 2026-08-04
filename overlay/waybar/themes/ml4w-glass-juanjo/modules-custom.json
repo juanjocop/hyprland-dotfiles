@@ -23,17 +23,29 @@
         "tooltip": true,
         "on-click": "~/.config/ml4w/settings/system-monitor.sh"
     },
-    // Fondo de vídeo (mpvpaper) — botón toggle ON/OFF. No arranca con el sistema.
-    // Al pulsar alterna mpvpaper y se autorefresca por señal (SIGRTMIN+8). Config del
-    // vídeo/rotación en el propio script livewallpaper.sh.
+    // Fondo de vídeo (mpvpaper) — UN botón por pantalla, independientes: cada uno enciende su
+    // propio mpvpaper en su monitor y se apaga sin tocar el otro. No arrancan con el sistema.
+    // El argumento final es la "ranura": 1 = monitor principal (LIVE_WALLPAPER_MONITOR de
+    // local.env, o el primero por id), 2 = el otro monitor conectado. Con una sola pantalla el
+    // script devuelve texto vacío para la ranura 2 y waybar oculta el botón.
+    // Los dos comparten la señal 8, así que un clic en cualquiera refresca ambos.
     "custom/livewallpaper": {
-        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh status",
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh status 1",
         "return-type": "json",
         "interval": "once",
         "signal": 8,
         "format": "{}",
         "tooltip": true,
-        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh toggle"
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh toggle 1"
+    },
+    "custom/livewallpaper2": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh status 2",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh toggle 2"
     },
     // Luz nocturna (hyprsunset) — override manual sobre el horario de hyprsunset.conf.
     // Clic: alterna cálido/neutro. Clic derecho: devuelve el mando al horario.
