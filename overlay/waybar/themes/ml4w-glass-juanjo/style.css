@@ -210,22 +210,34 @@ window#waybar.empty #window {
 }
 
 /* -----------------------------------------------------
- * Live Wallpaper (botón toggle mpvpaper)
+ * Live Wallpaper (un botón toggle de mpvpaper por pantalla)
  * ----------------------------------------------------- */
 
-#custom-livewallpaper {
+#custom-livewallpaper,
+#custom-livewallpaper2 {
     font-size: 15px;
     padding: 0px 6px;
 }
 
 /* Encendido: acento del theme. Apagado: atenuado. */
-#custom-livewallpaper.active {
+#custom-livewallpaper.active,
+#custom-livewallpaper2.active {
     color: @primary;
 }
 
-#custom-livewallpaper.inactive {
+#custom-livewallpaper.inactive,
+#custom-livewallpaper2.inactive {
     color: @on_surface;
     opacity: 0.45;
+}
+
+/* Sin monitor para esa ranura (portátil, o segunda pantalla desconectada): el script devuelve
+ * texto vacío y waybar oculta el módulo. Esto es solo el cinturón por si alguna versión dejase
+ * el hueco del padding. */
+#custom-livewallpaper.oculto,
+#custom-livewallpaper2.oculto {
+    padding: 0px;
+    margin: 0px;
 }
 
 /* -----------------------------------------------------
