@@ -91,6 +91,13 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
     dpms with retries: `overlay/ml4w-juanjo/scripts/despertar-pantallas.sh`, wired in from our
     `overlay/hypr/hypridle.conf`. Leaves a log in `~/.cache/ml4w-juanjo/`.
 
+  The **same DP link drop has a second consequence, on the way *out***: when DP-1 (the KTC H27E6)
+  reasserts HPD, Hyprland treats it as a **new** monitor and **modesets** it — which lights the
+  panel back up. So the idle screen-off didn't stick: DP-1 came back on ~8 s later and stayed on.
+  Fixed by the **vigilante** in `idle-guard.sh` (re-applies the dpms off while the off period
+  lasts, capped at 3 tries). It **must** be killed by `despertar-pantallas.sh` before any wake-up,
+  or it would undo the resume and reproduce issue #1. Full write-up in `README.md`.
+
   Moral: if a black screen returns, check `coredumpctl` **before** blaming the driver, and never
   trust `hyprctl monitors` alone — after a DP reconnect its dpms state can lie.
 

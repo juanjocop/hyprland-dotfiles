@@ -76,7 +76,7 @@ selector— y poner vídeos en la carpeta si se quiere el fondo de vídeo.
 | **Fastfetch: logo rotativo** | Muestra una imagen distinta al azar en cada arranque de terminal | `overlay/fastfetch/` |
 | **Visualizador de audio (cava)** | Barras al ritmo, en dos modos excluyentes: ventana (**SUPER+SHIFT+C**) y fondo (**SUPER+ALT+C**) | `overlay/cava/` + `overlay/ml4w-juanjo/` + `overlay/hypr/custom.lua` |
 | **Encendido robusto al reanudar** | Evita la pantalla en negro tras suspender: espera a que la sesión esté activa y **cicla** el DPMS con reintentos | `overlay/ml4w-juanjo/scripts/despertar-pantallas.sh` + `overlay/hypr/hypridle.conf` |
-| **Control de inactividad** | Botón 󰅶 desplegable en la barra: desactiva por separado el **bloqueo**, el **apagado de pantallas** y la **suspensión** (para dejar algo trabajando solo) | `overlay/ml4w-juanjo/scripts/idle-guard.sh` + `overlay/hypr/hypridle.conf` |
+| **Control de inactividad** | Botón 󰅶 desplegable en la barra: desactiva por separado el **bloqueo**, el **apagado de pantallas** y la **suspensión** (para dejar algo trabajando solo). Incluye el **vigilante** que reapaga la DP-1 cuando se enciende sola | `overlay/ml4w-juanjo/scripts/idle-guard.sh` + `overlay/hypr/hypridle.conf` |
 
 ---
 
@@ -426,6 +426,49 @@ vez que vuelves al equipo**. Por eso el guardián deja una marca `pantallas-apag
 solo llama a `despertar-pantallas.sh` si esa marca existe. El `$SELLO` de aquel script no cubre
 este caso: deduplica dos encendidos seguidos, no un encendido sin apagado previo.
 
+### La pantalla que se encendía sola (el vigilante)
+
+`dpms disable` apaga las dos, pero **la DP-1 (KTC H27E6, la de 240 Hz) se volvía a encender sola a
+los ~8 s y se quedaba encendida toda la noche**. Es el **mismo tirón de enlace DisplayPort** de la
+sección anterior, visto desde el otro lado: el monitor tira el enlace al quedarse sin señal y, al
+reasomar, Hyprland lo trata como un monitor **nuevo** y le hace **modeset** — y un modeset enciende
+el panel. Hyprland no recuerda que estábamos en modo "apagadas por inactividad", así que nadie
+deshace ese encendido. La DP-2 (ASUS MG278) no lo hace: es firmware del KTC. En el log de la sesión:
+
+```
+drm: Connector DP-1 disconnected  →  Disabling output DP-1  →  enabledState true -> false
+drm: Connector DP-1 connected     →  Connecting connector DP-1, CRTC ID 200
+drm: Modesetting DP-1 with 2560x1440@240.00Hz          ← aquí se enciende
+```
+
+Se veía doble, porque el ciclo incondicional del apagado sumaba lo suyo: la 1 encendida se apagaba
+y luego se encendían las dos. Arreglando la causa desaparecen los dos síntomas.
+
+`idle-guard.sh` lanza un **vigilante** que vive solo mientras dura el apagado: sondea `hyprctl
+monitors` cada 2 s y **reaplica el apagado** si alguna pantalla aparece encendida. Se sondea en vez
+de escuchar el socket2 de Hyprland porque el bucle solo vive durante el apagado y así no hacen
+falta `socat` ni `nc -U`, que no están garantizados en las dos máquinas.
+
+**Tres frenos, porque un vigilante que se equivoca deja el equipo a oscuras:**
+
+1. **Máximo 3 reaplicaciones.** Si un monitor tirase el enlace *cada* vez que lo apagamos esto sería
+   un ping-pong de parpadeos; tras 3 intentos se rinde, lo deja encendido (el comportamiento de
+   antes, ni mejor ni peor) y escribe el motivo en el log. *Medido en 7 ciclos reales: siempre
+   `reaplico apagado (1/3)`, nunca una segunda vez.*
+2. **Muere solo** si desaparece la marca, si `hyprctl` no contesta —hereda
+   `HYPRLAND_INSTANCE_SIGNATURE`, así que **solo puede tocar su propia sesión** de Hyprland— o a
+   las 8 h.
+3. **`despertar-pantallas.sh` lo mata nada más empezar.** Es lo crítico: al volver de una
+   suspensión las pantallas se encienden con la marca de apagado **todavía puesta**, y un vigilante
+   vivo desharía ese encendido → el fondo negro de la issue #1 otra vez. Quien manda al encender es
+   `despertar-pantallas.sh`.
+
+Comprobación de que funciona, en `~/.cache/ml4w-juanjo/despertar-pantallas.log`: cada reanudación
+registraba `estado: DP-2=0 DP-1=1` (la 1 encendida sola) y ahora registra `DP-2=0 DP-1=0`.
+
+> El fondo del asunto es firmware del KTC. Si algún día su OSD gana un *DP Deep Sleep* / *Auto
+> Standby*, ese sería el arreglo de raíz y el vigilante sobraría.
+
 ### Dos comportamientos que no son bugs
 
 1. **hypridle no reintenta un timeout ya vencido.** Si a los 30 min se ignora la suspensión y
@@ -454,6 +497,7 @@ overlay/                     ← fuente de verdad: solo lo que personalizamos
   ml4w-juanjo/scripts/cava-toggle.sh toggle de ambos modos (tile|bg) + exclusión mutua
   ml4w-juanjo/scripts/despertar-pantallas.sh  encendido robusto de pantallas al reanudar
   ml4w-juanjo/scripts/idle-guard.sh  guardián: decide si bloquear/apagar/suspender o ignorarlo
+                                     + vigilante: la DP-1 se reenciende sola y hay que reapagarla
   hypr/hypridle.conf                 igual que la de ML4W salvo el encendido robusto y el guardián
   fastfetch/config.jsonc             config con el glob del logo
   fastfetch/logos/*.png              conjunto de logos para la rotación
