@@ -37,6 +37,7 @@ set -uo pipefail   # sin -e a propósito: ningún fallo suelto debe abortar el r
 
 LOG="$HOME/.cache/ml4w-juanjo/despertar-pantallas.log"
 SELLO="$HOME/.cache/ml4w-juanjo/despertar-pantallas.stamp"
+PID_VIGILANTE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ml4w-juanjo/inactividad/vigilante.pid"
 ESPERA_SESION=15   # s máximos esperando a que logind reactive la sesión
 INTENTOS=3
 VENTANA=30         # s durante los que NO se repite un encendido que ya salió bien
@@ -87,6 +88,20 @@ reciente() {
 }
 
 log "── despertar (sesión ${XDG_SESSION_ID:-?}) ──"
+
+# 0.a LO PRIMERO: matar al vigilante del apagado de idle-guard.sh, si lo hay. Mientras las
+#     pantallas estén apagadas por inactividad, ese bucle reaplica el apagado cada vez que un
+#     monitor se enciende solo (la DP-1 lo hace: tira el enlace DP y Hyprland la vuelve a
+#     modesetear). Aquí venimos a ENCENDER, y al volver de una suspensión la marca de apagado
+#     sigue puesta — un vigilante vivo desharía nuestro encendido y dejaría el fondo negro de la
+#     issue #1. Quien manda es este script: primero se le para, luego se enciende.
+if [[ -f "$PID_VIGILANTE" ]]; then
+    vig_pid=$(<"$PID_VIGILANTE")
+    rm -f "$PID_VIGILANTE"
+    if [[ -n "$vig_pid" ]] && kill "$vig_pid" 2>/dev/null; then
+        log "vigilante del apagado (pid $vig_pid) parado antes de encender"
+    fi
+fi
 
 # 0. Al reanudar se nos llama dos veces: `after_sleep_cmd` al despertar el sistema y, unos
 #    segundos después, el `on-resume` del listener de 11 min en cuanto el usuario mueve el ratón.
