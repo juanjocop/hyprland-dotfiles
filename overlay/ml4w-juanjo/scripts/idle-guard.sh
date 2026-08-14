@@ -93,8 +93,26 @@ emitir() { printf '{"text":"%s","tooltip":"%s","class":"%s"}\n' "$1" "$2" "$3"; 
 #
 # TRES FRENOS, porque un vigilante que se equivoca deja el equipo a oscuras:
 #   1. $VIG_MAX_REAP. Si el monitor vuelve a tirar el enlace cada vez que lo apagamos, esto sería
-#      un ping-pong de parpadeos. Tras N reaplicaciones se rinde y lo deja encendido — o sea, el
-#      comportamiento de antes de este parche, ni mejor ni peor, y con el motivo en el log.
+#      un ping-pong de parpadeos. Tras N reaplicaciones se rinde — y AL RENDIRSE DESHACE EL
+#      APAGADO: borra la marca y llama a despertar-pantallas.sh para dejarlo todo encendido.
+#
+#      DESHACER NO ES UN EXTRA, ES EL ARREGLO DE UN FALLO REAL (verificado el 2026-08-06, no
+#      re-derivar). Antes esta rama solo hacía `break`, con el comentario de que rendirse dejaba
+#      "el comportamiento de antes de este parche, ni mejor ni peor". Era FALSO: se rendía con la
+#      DP-1 encendida (se reenciende sola) y la DP-2 APAGADA, porque esa NO se reenciende sola.
+#      Con la marca aún puesta, lo único capaz de reencenderla era el `on-resume` de hypridle...
+#      que aquel día no llegó nunca: hubo dos `pantallas-off` seguidos (10:10 y 10:37) sin un solo
+#      `on-resume` entre medias, con clics de ratón en el log de Hyprland y la DP-2 negra 45 min.
+#      En hyprland.log se ve clavado: un único `DP-2 enabledState true -> false` y 2.500 líneas
+#      después nadie lo ha deshecho, mientras la DP-1 se modesetea sola diez veces.
+#      Sospecha del `on-resume` perdido (NO probada, haría falta relanzar hypridle capturando su
+#      salida — el lanzador de ML4W la manda a /dev/null): el trasiego de desconexión/reconexión
+#      de la DP-1 recrea la notificación de idle del compositor y hypridle re-arma el `on-timeout`
+#      contra un objeto obsoleto, perdiendo el `resumed`. Misma familia que el "`hyprctl monitors`
+#      miente tras una reconexión DP". Moraleja de diseño: NO se puede confiar en que ese aviso
+#      llegue, así que el vigilante no puede irse dejando pantallas muertas. Si el apagado no se
+#      puede sostener, lo único coherente es encenderlo todo.
+#      La salida de emergencia por si aun así te quedas a oscuras: SUPER+SHIFT+D (custom.lua).
 #   2. Muere solo. Si desaparece la marca (volviste al equipo), si `hyprctl` no contesta (Hyprland
 #      se ha reiniciado: hereda HYPRLAND_INSTANCE_SIGNATURE, así que solo puede tocar SU sesión) o
 #      si pasan $VIG_MAX_HORAS.
@@ -121,7 +139,7 @@ arrancar_vigilante() {
 
 vigilante() {
     echo $$ > "$PID_VIGILANTE"
-    local reaplicaciones=0 encendidas salida
+    local reaplicaciones=0 encendidas salida rendido=0 nuestro=0
     local fin=$(( $(date +%s) + VIG_MAX_HORAS * 3600 ))
     while sleep "$VIG_INTERVALO"; do
         [[ -f "$MARCA_APAGADAS" ]] || break            # has vuelto al equipo: ya no pintamos nada
@@ -131,6 +149,7 @@ vigilante() {
         encendidas=$(monitores_encendidos "$salida")
         if (( reaplicaciones >= VIG_MAX_REAP )); then
             log "vigilante: ${encendidas}se enciende(n) sola(s) una y otra vez; me rindo tras $VIG_MAX_REAP intentos"
+            rendido=1
             break
         fi
         (( reaplicaciones++ ))
@@ -138,7 +157,27 @@ vigilante() {
         hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })' >/dev/null 2>&1
     done
     # Solo si el fichero sigue siendo nuestro: si nos han relevado, es del vigilante nuevo.
-    [[ -f "$PID_VIGILANTE" && "$(<"$PID_VIGILANTE")" == "$$" ]] && rm -f "$PID_VIGILANTE"
+    if [[ -f "$PID_VIGILANTE" && "$(<"$PID_VIGILANTE")" == "$$" ]]; then
+        nuestro=1
+        rm -f "$PID_VIGILANTE"
+    fi
+
+    # RENDIRSE ES DESHACER (ver el freno 1 en la nota de arriba): si no podemos sostener el
+    # apagado, dejarlo a medias es peor que no haberlo intentado — la DP-2 se queda negra y solo
+    # un `on-resume` que puede no llegar la rescataría.
+    #
+    # El orden importa DOS veces:
+    #   - el fichero de PID ya está borrado, porque el paso 0.a de despertar-pantallas.sh mata al
+    #     PID que encuentre ahí, y ese PID somos nosotros: nos suicidaríamos a media limpieza;
+    #   - la marca se borra ANTES de encender, para que un `on-resume` que llegue tarde no vuelva
+    #     a ciclar el DPMS y provoque un parpadeo de más.
+    # Y solo si el fichero seguía siendo nuestro: si nos han relevado, manda el vigilante nuevo,
+    # que tiene su propia marca recién puesta y no queremos deshacerle el apagado.
+    if (( rendido && nuestro )); then
+        log "vigilante: deshago el apagado para no dejar ninguna pantalla muerta"
+        rm -f "$MARCA_APAGADAS"
+        "$DESPERTAR"
+    fi
     return 0
 }
 

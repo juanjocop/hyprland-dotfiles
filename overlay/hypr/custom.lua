@@ -33,6 +33,24 @@ hl.bind(
     { description = "Toggle visualizador cava (fondo)" }
 )
 
+-- SUPER+SHIFT+D → despertar las pantallas a mano. Es la SALIDA DE EMERGENCIA del apagado por
+-- inactividad, y existe porque el aviso de vuelta puede perderse: el 2026-08-06 el `on-resume`
+-- de hypridle no llegó nunca y la DP-2 se quedó negra 45 min (el porqué, en la cabecera de
+-- idle-guard.sh). En ese estado el botón de la barra no sirve de nada — no se ve. A ciegas, esta
+-- tecla sí. Tiene que ser un bind de Hyprland precisamente por eso: no depende de ver nada.
+--
+-- Llama a la MISMA acción que hypridle en su `on-resume`: para al vigilante, borra la marca de
+-- apagado y cicla el DPMS con reintentos. Es inofensiva con las pantallas ya encendidas: sin
+-- marca no cicla nada, solo lo anota en el log ("reanudación sin apagado previo").
+--
+-- D verificada libre: de las SUPER+SHIFT, ML4W ocupa A B G H M Q R S T W, los dígitos y las
+-- flechas; la C es nuestra (arriba).
+hl.bind(
+    "SUPER + SHIFT + D",
+    hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/idle-guard.sh accion pantallas-on"),
+    { description = "Despertar pantallas (rescate del apagado por inactividad)" }
+)
+
 -- NOTA sobre el blur de las barras: se hace en Qt (MultiEffect dentro del shell.qml), NO con
 -- `hl.layer_rule({ match = { namespace = "cava-bg-juanjo" }, blur = true })`.
 --
