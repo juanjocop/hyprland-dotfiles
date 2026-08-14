@@ -451,10 +451,10 @@ falta `socat` ni `nc -U`, que no están garantizados en las dos máquinas.
 
 **Tres frenos, porque un vigilante que se equivoca deja el equipo a oscuras:**
 
-1. **Máximo 3 reaplicaciones.** Si un monitor tirase el enlace *cada* vez que lo apagamos esto sería
-   un ping-pong de parpadeos; tras 3 intentos se rinde, lo deja encendido (el comportamiento de
-   antes, ni mejor ni peor) y escribe el motivo en el log. *Medido en 7 ciclos reales: siempre
-   `reaplico apagado (1/3)`, nunca una segunda vez.*
+1. **Máximo 3 reaplicaciones, y al rendirse DESHACE.** Si un monitor tirase el enlace *cada* vez que
+   lo apagamos esto sería un ping-pong de parpadeos; tras 3 intentos se rinde, y entonces **borra la
+   marca y llama a `despertar-pantallas.sh` para encenderlo todo**, con el motivo en el log.
+   *Medido en 7 ciclos reales: normalmente `reaplico apagado (1/3)` y nunca una segunda vez.*
 2. **Muere solo** si desaparece la marca, si `hyprctl` no contesta —hereda
    `HYPRLAND_INSTANCE_SIGNATURE`, así que **solo puede tocar su propia sesión** de Hyprland— o a
    las 8 h.
@@ -468,6 +468,40 @@ registraba `estado: DP-2=0 DP-1=1` (la 1 encendida sola) y ahora registra `DP-2=
 
 > El fondo del asunto es firmware del KTC. Si algún día su OSD gana un *DP Deep Sleep* / *Auto
 > Standby*, ese sería el arreglo de raíz y el vigilante sobraría.
+
+#### Por qué rendirse tiene que ser *deshacer* (2026-08-06)
+
+El freno 1 decía que rendirse dejaba «el comportamiento de antes, ni mejor ni peor». **Era falso**, y
+costó una DP-2 negra durante 45 min. Rendirse dejaba la **DP-1 encendida** (se reenciende sola) y la
+**DP-2 apagada** (esa no), y con la marca puesta lo único capaz de reencenderla era el `on-resume` de
+hypridle. Aquel día **no llegó nunca**.
+
+La evidencia, en el `hyprland.log` de la sesión:
+
+- Un **único** `DP-2 enabledState true -> false` (el apagado legítimo), y 2.500 líneas después nadie
+  lo ha deshecho. Mientras, `Modesetting DP-1` **diez veces**: el ping-pong.
+- **Clics de ratón** (eventos libinput) en pleno tramo, con la DP-2 negra → el usuario estaba activo
+  y aun así `pantallas-on` no se ejecutó ni una vez (ningún log de hoy en los dos ficheros).
+- Dos `pantallas-off` (10:10 y 10:37) **sin un solo `on-resume` entre medias**, cosa que hypridle no
+  debería hacer.
+- 470 `atomic drm request: failed to commit: Device or resource busy` concentrados exactamente en la
+  franja del ping-pong.
+
+**Sospecha, no demostrada:** el trasiego de desconexión/reconexión de la DP-1 recrea la notificación
+de idle del compositor y hypridle re-arma el `on-timeout` contra un objeto obsoleto, perdiendo el
+`resumed`. Misma familia que el «`hyprctl monitors` miente tras una reconexión DP». Confirmarlo
+exigiría relanzar hypridle capturando su salida — el lanzador de ML4W la manda a `/dev/null`.
+
+**La moraleja de diseño no depende de resolver esa incógnita:** no se puede confiar en que el aviso
+de vuelta llegue, así que el vigilante **no puede irse dejando pantallas muertas**. Si el apagado no
+se puede sostener, lo único coherente es encenderlo todo.
+
+Y por si aun así te quedas a oscuras (las dos apagadas y el `on-resume` perdido: ahí el botón de la
+barra no sirve, no se ve), hay una **salida de emergencia a ciegas**:
+
+| Tecla | Qué hace |
+|---|---|
+| **SUPER+SHIFT+D** | Despierta las pantallas a mano. Es la misma acción que el `on-resume` de hypridle: para al vigilante, borra la marca y cicla el DPMS con reintentos. Inofensiva con las pantallas ya encendidas (sin marca no cicla nada). |
 
 ### Dos comportamientos que no son bugs
 
@@ -490,7 +524,7 @@ registraba `estado: DP-2=0 DP-1=1` (la 1 encendida sola) y ahora registra `DP-2=
 overlay/                     ← fuente de verdad: solo lo que personalizamos
   waybar/themes/ml4w-glass-juanjo/   theme propio (temps + botón fondo vídeo)
   hypr/hyprsunset.conf               horario de luz nocturna
-  hypr/custom.lua                    hook oficial de ML4W: los dos binds de cava
+  hypr/custom.lua                    hook oficial de ML4W: binds de cava + rescate de pantallas
   cava/config                        cava del modo ventana (salida ncurses)
   ml4w-juanjo/cava-bg/cava-raw.conf  cava del modo fondo (salida raw para el QML)
   ml4w-juanjo/quickshell/cavabg/     widget del fondo (franja + colores de matugen)
@@ -498,6 +532,8 @@ overlay/                     ← fuente de verdad: solo lo que personalizamos
   ml4w-juanjo/scripts/despertar-pantallas.sh  encendido robusto de pantallas al reanudar
   ml4w-juanjo/scripts/idle-guard.sh  guardián: decide si bloquear/apagar/suspender o ignorarlo
                                      + vigilante: la DP-1 se reenciende sola y hay que reapagarla
+                                     (y si no puede sostener el apagado, lo deshace: nunca deja
+                                      una pantalla muerta esperando un on-resume que puede faltar)
   hypr/hypridle.conf                 igual que la de ML4W salvo el encendido robusto y el guardián
   fastfetch/config.jsonc             config con el glob del logo
   fastfetch/logos/*.png              conjunto de logos para la rotación
