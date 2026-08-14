@@ -24,7 +24,7 @@ ni plantillas:
 |---|---|
 | Sensor de CPU (`coretemp` ↔ `k10temp`) | `scripts/cputemp.sh` busca el hwmon por **nombre** |
 | Dirección PCI y modelo de la GPU | `scripts/gputemp.sh` los saca de `lspci` y de `nvidia-smi` |
-| Cuántas pantallas tienen fondo de vídeo | `scripts/livewallpaper.sh` da **un botón por monitor**; el 2º se oculta si no hay |
+| Cuántas pantallas tienen fondo de vídeo | `scripts/livewallpaper.sh` da **un desplegable por monitor**; el 2º se oculta entero si no hay |
 | Sin batería en el sobremesa | waybar descarta el módulo solo si no hay ninguna |
 
 Así se mantiene intacta la regla de oro (*el vivo es una copia byte a byte del overlay*) y
@@ -71,12 +71,12 @@ selector— y poner vídeos en la carpeta si se quiere el fondo de vídeo.
 | Personalización | Qué hace | Dónde |
 |---|---|---|
 | **Waybar: temperaturas** | Temp de CPU y GPU (Optimus: Intel iGPU + NVIDIA dGPU) en la barra | theme propio `ml4w-glass-juanjo` |
-| **Waybar: botones de fondo de vídeo** | Un botón por pantalla (`󰕧¹` `󰕧²`) que enciende/apaga un fondo de vídeo (mpvpaper) en **cada monitor por separado** | `scripts/livewallpaper.sh` |
+| **Waybar: fondo de vídeo** | Un botón por pantalla (`󰕧¹` `󰕧²`) que enciende/apaga un fondo de vídeo (mpvpaper) en **cada monitor por separado**, y que al pasar el ratón **despliega tres controles de esa pantalla**: sonido (exclusivo entre pantallas), rotación automática y saltar al siguiente vídeo | `scripts/livewallpaper.sh` |
 | **Luz nocturna (hyprsunset)** | Filtro de luz azul automático por horario **21:00 → 07:00** (4000 K) | `overlay/hypr/hyprsunset.conf` + systemd |
 | **Fastfetch: logo rotativo** | Muestra una imagen distinta al azar en cada arranque de terminal | `overlay/fastfetch/` |
 | **Visualizador de audio (cava)** | Barras al ritmo, en dos modos excluyentes: ventana (**SUPER+SHIFT+C**) y fondo (**SUPER+ALT+C**) | `overlay/cava/` + `overlay/ml4w-juanjo/` + `overlay/hypr/custom.lua` |
 | **Encendido robusto al reanudar** | Evita la pantalla en negro tras suspender: espera a que la sesión esté activa y **cicla** el DPMS con reintentos | `overlay/ml4w-juanjo/scripts/despertar-pantallas.sh` + `overlay/hypr/hypridle.conf` |
-| **Control de inactividad** | Botón 󰅶 desplegable en la barra: desactiva por separado el **bloqueo**, el **apagado de pantallas** y la **suspensión** (para dejar algo trabajando solo). Incluye el **vigilante** que reapaga la DP-1 cuando se enciende sola | `overlay/ml4w-juanjo/scripts/idle-guard.sh` + `overlay/hypr/hypridle.conf` |
+| **Control de inactividad** | Botón 󰅶 desplegable en la barra: desactiva por separado el **bloqueo**, el **apagado de pantallas** y la **suspensión** (para dejar algo trabajando solo). Incluye el **vigilante** que reapaga la DP-1 cuando se enciende sola, y **SUPER+SHIFT+D** para despertar las pantallas a ciegas | `overlay/ml4w-juanjo/scripts/idle-guard.sh` + `overlay/hypr/hypridle.conf` + `overlay/hypr/custom.lua` |
 
 ---
 
@@ -131,6 +131,57 @@ Notas:
   (kitty/sixel).
 - Buenas fuentes: [Dashboard Icons](https://dashboardicons.com), logos SVG oficiales de cada
   proyecto exportados a PNG transparente.
+
+---
+
+## Fondo de vídeo (el desplegable 󰕧 de la barra)
+
+Un **grupo desplegable por pantalla**, independientes: `󰕧¹` y `󰕧²` encienden y apagan su propio
+`mpvpaper` en su monitor, y al pasar el ratón despliegan tres controles **de esa pantalla**:
+
+| Icono | Qué hace |
+|---|---|
+| `󰕾` | **Sonido** del vídeo. Es **exclusivo**: activarlo en una pantalla silencia la otra (dos bandas sonoras a la vez no se entienden). Siempre arranca en silencio. |
+| `󰑖` | **Rotación** automática de vídeo cada 5 min. Coloreado = rotando, atenuado = vídeo fijo. Es **pegajosa**: si la apagas, sigue apagada la próxima vez que enciendas el fondo. |
+| `󰒭` | **Saltar** ya al siguiente vídeo, sin esperar. Reinicia la cuenta de los 5 min. |
+
+Los tres se **ocultan solos** si ese fondo está apagado: no hay nada que controlar. Con una sola
+pantalla, la ranura 2 entera (ancla incluida) desaparece de la barra.
+
+### Cómo se controla mpv sin relanzarlo
+
+Cada instancia se lanza con un **socket IPC** (`-o "input-ipc-server=…"`, camino que el propio man
+de `mpvpaper` documenta) en `$XDG_RUNTIME_DIR/mpvpaper-<MONITOR>.sock`, y los clics hablan por ahí
+con `socat`. Relanzar `mpvpaper` para cada cambio cortaría el vídeo, perdería la posición y
+rebarajaría la lista.
+
+Tres decisiones que **no hay que "simplificar"**:
+
+- **El audio se controla con `mute`, no con `aid`** — y por eso `mpvpaper` arranca con `mute=yes` y
+  ya no con `no-audio`. `mute` es estable aunque el vídeo de turno **no tenga pista de audio** y
+  sobrevive a los cambios de vídeo; con `aid` el icono mentiría en cuanto tocase un vídeo mudo.
+  Coste asumido: mientras el fondo esté encendido, mpv mantiene un stream silenciado en el
+  mezclador.
+- **`-n 86400` no es la rotación.** El `-n <s>` de `mpvpaper` es un temporizador **interno suyo**,
+  no una propiedad de mpv: no se puede parar ni adelantar por IPC. Pero ese mismo flag es el camino
+  por el que `mpvpaper` convierte la **carpeta** en una playlist, así que se conserva con un valor
+  tan grande que nunca estorba. Quitarlo del todo arriesga quedarse sin lista que rotar
+  (`playlist-count` debe dar el número de vídeos, no `1`).
+- **La rotación la lleva un bucle propio**, uno por monitor, lanzado desde `start()` y matado en
+  `stop()`. No guarda nada en memoria: lee el reloj de `~/.cache/ml4w-juanjo/livewallpaper-ultimo-<MON>`,
+  de modo que el botón de saltar reinicia la cuenta sin tener que hablar con él. Si `mpvpaper`
+  muere sin pasar por `stop()`, el bucle se entera en un tick y sale solo.
+
+Para pasar de vídeo **no** se usa `playlist-next`: en la última entrada `weak` no hace nada y
+`force` puede terminar la reproducción. Se leen `playlist-pos` y `playlist-count` y se salta a
+`(pos+1) % count` — determinista y da la vuelta al final de la lista.
+
+### El estado vive en ficheros, no en mpv
+
+`waybar` refresca los ocho módulos a la vez y cada ida y vuelta por el socket cuesta décimas, así
+que **ningún `*-status` consulta a mpv**: como los únicos que tocamos el reproductor somos
+nosotros, el estado se anota en `~/.cache/ml4w-juanjo/livewallpaper-*-<MONITOR>` y por IPC solo van
+los **clics**, donde el retardo no se nota.
 
 ---
 

@@ -210,32 +210,70 @@ window#waybar.empty #window {
 }
 
 /* -----------------------------------------------------
- * Live Wallpaper (un botón toggle de mpvpaper por pantalla)
+ * Live Wallpaper (un grupo desplegable de mpvpaper por pantalla)
  * ----------------------------------------------------- */
 
+/* Las CAJAS de los dos grupos van sin padding ni margen a propósito: el espaciado vive en los
+ * hijos, igual que cuando los botones colgaban directamente de modules-right. Así, en el
+ * portátil —donde la ranura 2 entera se oculta— el grupo vacío no deja un hueco en la barra. */
+#livewallpaper,
+#livewallpaper2 {
+    padding: 0px;
+    margin: 0px;
+}
+
 #custom-livewallpaper,
-#custom-livewallpaper2 {
+#custom-livewallpaper2,
+#custom-livewallpaper-audio,
+#custom-livewallpaper2-audio,
+#custom-livewallpaper-rotacion,
+#custom-livewallpaper2-rotacion,
+#custom-livewallpaper-saltar,
+#custom-livewallpaper2-saltar {
     font-size: 15px;
     padding: 0px 6px;
 }
 
-/* Encendido: acento del theme. Apagado: atenuado. */
+/* Misma convención que el resto de la barra: coloreado = encendido, atenuado = apagado.
+ * Vale igual para el ancla (fondo de vídeo ON/OFF) y para los interruptores del desplegable
+ * (sonido y rotación automática). */
 #custom-livewallpaper.active,
-#custom-livewallpaper2.active {
+#custom-livewallpaper2.active,
+#custom-livewallpaper-audio.active,
+#custom-livewallpaper2-audio.active,
+#custom-livewallpaper-rotacion.active,
+#custom-livewallpaper2-rotacion.active {
     color: @primary;
 }
 
 #custom-livewallpaper.inactive,
-#custom-livewallpaper2.inactive {
+#custom-livewallpaper2.inactive,
+#custom-livewallpaper-audio.inactive,
+#custom-livewallpaper2-audio.inactive,
+#custom-livewallpaper-rotacion.inactive,
+#custom-livewallpaper2-rotacion.inactive {
     color: @on_surface;
     opacity: 0.45;
 }
 
-/* Sin monitor para esa ranura (portátil, o segunda pantalla desconectada): el script devuelve
- * texto vacío y waybar oculta el módulo. Esto es solo el cinturón por si alguna versión dejase
- * el hueco del padding. */
+/* Saltar al siguiente vídeo es una ACCIÓN, no un interruptor: no hay estado que pintar, así que
+ * ni se colorea (parecería "activado") ni se atenúa (parecería "no disponible"). */
+#custom-livewallpaper-saltar.accion,
+#custom-livewallpaper2-saltar.accion {
+    color: @on_surface;
+}
+
+/* Sin monitor para esa ranura (portátil, o segunda pantalla desconectada), o hijo de un fondo
+ * apagado: el script devuelve texto vacío y waybar oculta el módulo. Esto es solo el cinturón
+ * por si alguna versión dejase el hueco del padding. */
 #custom-livewallpaper.oculto,
-#custom-livewallpaper2.oculto {
+#custom-livewallpaper2.oculto,
+#custom-livewallpaper-audio.oculto,
+#custom-livewallpaper2-audio.oculto,
+#custom-livewallpaper-rotacion.oculto,
+#custom-livewallpaper2-rotacion.oculto,
+#custom-livewallpaper-saltar.oculto,
+#custom-livewallpaper2-saltar.oculto {
     padding: 0px;
     margin: 0px;
 }

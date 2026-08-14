@@ -23,12 +23,45 @@
         "tooltip": true,
         "on-click": "~/.config/ml4w/settings/system-monitor.sh"
     },
-    // Fondo de vídeo (mpvpaper) — UN botón por pantalla, independientes: cada uno enciende su
-    // propio mpvpaper en su monitor y se apaga sin tocar el otro. No arrancan con el sistema.
+    // ── Fondo de vídeo (mpvpaper) ─────────────────────────────────────────────────────────────
+    // UN grupo desplegable por pantalla, independientes: cada uno enciende su propio mpvpaper en
+    // su monitor y se apaga sin tocar el otro. No arrancan con el sistema.
     // El argumento final es la "ranura": 1 = monitor principal (LIVE_WALLPAPER_MONITOR de
     // local.env, o el primero por id), 2 = el otro monitor conectado. Con una sola pantalla el
-    // script devuelve texto vacío para la ranura 2 y waybar oculta el botón.
-    // Los dos comparten la señal 8, así que un clic en cualquiera refresca ambos.
+    // script devuelve texto vacío para toda la ranura 2 y waybar oculta el grupo entero.
+    // Todos comparten la señal 8, así que un clic en cualquiera los refresca a todos.
+    //
+    // El ancla (󰕧¹ / 󰕧²) enciende y apaga. Al pasar el ratón se despliegan tres controles de ESA
+    // pantalla: sonido, rotación automática y saltar al siguiente vídeo. Los tres se ocultan
+    // solos si ese fondo está apagado (no hay nada que controlar).
+    "group/livewallpaper": {
+        "orientation": "inherit",
+        "drawer": {
+            "transition-duration": 300,
+            "children-class": "livewallpaper-hijo",
+            "transition-left-to-right": false
+        },
+        "modules": [
+            "custom/livewallpaper",
+            "custom/livewallpaper-audio",
+            "custom/livewallpaper-rotacion",
+            "custom/livewallpaper-saltar"
+        ]
+    },
+    "group/livewallpaper2": {
+        "orientation": "inherit",
+        "drawer": {
+            "transition-duration": 300,
+            "children-class": "livewallpaper-hijo",
+            "transition-left-to-right": false
+        },
+        "modules": [
+            "custom/livewallpaper2",
+            "custom/livewallpaper2-audio",
+            "custom/livewallpaper2-rotacion",
+            "custom/livewallpaper2-saltar"
+        ]
+    },
     "custom/livewallpaper": {
         "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh status 1",
         "return-type": "json",
@@ -38,6 +71,33 @@
         "tooltip": true,
         "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh toggle 1"
     },
+    "custom/livewallpaper-audio": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh audio-status 1",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh audio-toggle 1"
+    },
+    "custom/livewallpaper-rotacion": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh rotacion-status 1",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh rotacion-toggle 1"
+    },
+    "custom/livewallpaper-saltar": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh saltar-status 1",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh saltar 1"
+    },
     "custom/livewallpaper2": {
         "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh status 2",
         "return-type": "json",
@@ -46,6 +106,33 @@
         "format": "{}",
         "tooltip": true,
         "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh toggle 2"
+    },
+    "custom/livewallpaper2-audio": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh audio-status 2",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh audio-toggle 2"
+    },
+    "custom/livewallpaper2-rotacion": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh rotacion-status 2",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh rotacion-toggle 2"
+    },
+    "custom/livewallpaper2-saltar": {
+        "exec": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh saltar-status 2",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.config/waybar/themes/ml4w-glass-juanjo/scripts/livewallpaper.sh saltar 2"
     },
     // Luz nocturna (hyprsunset) — override manual sobre el horario de hyprsunset.conf.
     // Clic: alterna cálido/neutro. Clic derecho: devuelve el mando al horario.
