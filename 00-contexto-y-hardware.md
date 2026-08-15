@@ -84,17 +84,53 @@ Dato para no sacar conclusiones falsas al medir consumo de cualquier cosa:
 
 ## Audio y MPRIS (verificado 2026-07)
 
-Contexto para cualquier cosa de música/reproductores. **Nada de esto afecta a cava**, que lee
-directamente del monitor de PipeWire y por eso visualiza *cualquier* audio del sistema sea cual sea
-el reproductor; es contexto para módulos de waybar/Quickshell futuros.
+Contexto para cualquier cosa de música/reproductores. cava lee del **monitor de un sink**, así que
+es indiferente al reproductor (visualiza Zen, VLC o un juego por igual) — pero **no** es indiferente
+a la *salida*: ver el aviso de `source = auto` justo abajo.
 
 ### Fuente de audio (para cava y similares)
 
-- Monitor del sink: `alsa_output.pci-0000_00_1f.3.analog-stereo.monitor`.
-- cava con `source = auto` **autodetecta bien** (PoC 2026-07: picos de 86/100 con Zen sonando).
-  Solo hace falta fijar la fuente a mano si algún día falla la autodetección.
+- Monitor del sink: `alsa_output.<sink>.monitor` (el nombre exacto cambia por equipo y por perfil;
+  sácalo con `pactl list sinks short`).
 - El monitor aparece `SUSPENDED` cuando no suena nada y pasa a `RUNNING` con audio. Es normal:
   no confundirlo con un fallo.
+
+### `source = auto` de cava escucha UNA salida, y no cambia nunca ⚠️ (verificado 2026-08-15)
+
+El PoC de 2026-07 dijo que «autodetecta bien» y eso **se malinterpretó**: autodetecta *una vez*.
+El backend de pulse de cava resuelve el monitor del sink **predeterminado al arrancar** y se queda
+ahí para siempre. Consecuencias, las dos reales:
+
+- si el audio sale por un sink que **no** es el predeterminado → barras planas;
+- si cambias de salida con cava **ya abierto** → barras planas.
+
+Caso que lo destapó: predeterminado = auriculares HyperX, pero el audio del fondo de vídeo iba al
+HDMI del ASUS. `pactl list source-outputs` mostraba cava clavado en el monitor de los HyperX
+(`IDLE`) mientras el del HDMI estaba `RUNNING`. **No es un fallo de la config ni de cava: es su
+diseño.** No se arregla poniendo la fuente a mano — eso solo cambia a qué salida única te atas.
+
+La solución del overlay es `overlay/ml4w-juanjo/scripts/cava-enlazar-audio.sh`: PipeWire permite
+enlazar **varias** salidas al mismo puerto de entrada y las **suma**, así que el script engancha el
+monitor de *todos* los sinks a `cava:input_FL/FR` con `pw-link`. Lo arranca `cava-toggle.sh` en los
+dos modos y se muere solo con cava.
+
+Va **en bucle** (2 s), no de una pasada, porque hay tres cosas que rompen los enlaces y las tres
+pasan en uso normal: aparece un sink nuevo (bluetooth, cambio de perfil de la tarjeta), cambia el
+sink predeterminado —y al **mover** el stream de cava, pulse-server deshace los enlaces existentes,
+los nuestros incluidos— o desaparece un sink. `pw-link` sobre un enlace que ya existe falla con
+«File exists» sin duplicar, así que repetir es idempotente y no hay que comparar nada.
+
+Dos trampas al tocar esto:
+
+- **Filtrar los sinks con `pactl`, no con `pw-link -o | grep monitor`.** En esa lista también salen
+  `cava:monitor_*` (cava es un stream de captura y expone monitor: enlazarlo a su propia entrada
+  es un **bucle de realimentación**) y los medidores de picos de pavucontrol.
+- **Nada de `pkill -f cava-enlazar-audio.sh`** para evitar duplicados: ese patrón casa también con
+  la shell que ejecuta el script, y se suicida. La instancia única va con `flock`.
+
+Efectos secundarios asumidos: las barras muestran la **suma** de todas las salidas, y mientras cava
+está visible **todos los sinks se quedan despiertos** (pasan a tener un consumidor activo) — en el
+portátil es consumo extra, acotado porque el toggle mata cava al ocultarlo.
 
 ### El navegador se llama `firefox` en el bus MPRIS ⚠️
 

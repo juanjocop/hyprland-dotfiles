@@ -17,6 +17,10 @@
 # Cada modo apunta solo a SU proceso. `pgrep -x cava` no debe volver a aparecer aquí.
 #
 # Cerrar el tile = matar su kitty; cava muere con ella (es su proceso hijo vía `-e`).
+#
+# Los dos modos arrancan además cava-enlazar-audio.sh, que engancha cava al monitor de TODOS los
+# sinks. Sin él cava solo oye la salida predeterminada que hubiera al arrancar (ver ese script).
+# No hace falta pararlo: se muere solo al desaparecer el nodo de cava.
 set -euo pipefail
 
 MODE="${1:-tile}"
@@ -31,8 +35,15 @@ bg_running() { pgrep -f "$BG_PAT" >/dev/null; }
 stop_tile() { pkill -f "$TILE_PAT" 2>/dev/null || true; }
 stop_bg() { pkill -f "$BG_PAT" 2>/dev/null || true; }
 
-start_tile() { kitty --class cava-visualizer -e cava >/dev/null 2>&1 & }
-start_bg() { qs -p "$BG_DIR" >/dev/null 2>&1 & }
+ENLAZADOR="$HOME/.config/ml4w-juanjo/scripts/cava-enlazar-audio.sh"
+
+# Se lanza sin comprobar si ya había otro: el propio enlazador lleva un lock y el sobrante se
+# retira solo. Ojo, aquí NO vale un `pkill -f cava-enlazar-audio.sh` de guardia — ese patrón
+# también casa con la shell que ejecuta este script y se la lleva por delante.
+start_enlazador() { [[ -x "$ENLAZADOR" ]] && { "$ENLAZADOR" >/dev/null 2>&1 & }; }
+
+start_tile() { kitty --class cava-visualizer -e cava >/dev/null 2>&1 & start_enlazador; }
+start_bg() { qs -p "$BG_DIR" >/dev/null 2>&1 & start_enlazador; }
 
 case "$MODE" in
 tile)

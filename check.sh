@@ -26,6 +26,7 @@ OURS=(
   ml4w-juanjo/cava-bg/cava-raw.conf
   ml4w-juanjo/quickshell/cavabg/shell.qml
   ml4w-juanjo/scripts/cava-toggle.sh
+  ml4w-juanjo/scripts/cava-enlazar-audio.sh
   ml4w-juanjo/scripts/despertar-pantallas.sh
   ml4w-juanjo/scripts/idle-guard.sh
   hypr/custom.lua

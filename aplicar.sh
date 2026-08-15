@@ -80,6 +80,7 @@ cp -f "$ROOT"/overlay/hypr/conf/decorations/*.lua "$DEST/hypr/conf/decorations/"
 #    - config de cava del tile → ~/.config/cava/ (namespace propio, fuera de ML4W → cero deriva).
 #    - config raw + widget Quickshell del fondo → ~/.config/ml4w-juanjo/ (namespace propio, ídem).
 #    - script del toggle (ambos modos) → ~/.config/ml4w-juanjo/scripts/ (ídem).
+#    - enlazador de audio → ídem. Sin él cava solo oye la salida predeterminada del arranque.
 #    - custom.lua → hook oficial de ML4W (lo carga el último). Este SÍ cae dentro del árbol
 #      de ML4W porque ~/.config/hypr es symlink → check.sh lo vigila por si un update lo poda.
 mkdir -p "$DEST/cava" "$DEST/ml4w-juanjo/scripts" "$DEST/ml4w-juanjo/cava-bg" \
@@ -90,6 +91,9 @@ rsync -a --delete "$ROOT/overlay/ml4w-juanjo/quickshell/cavabg/" \
                   "$DEST/ml4w-juanjo/quickshell/cavabg/"
 cp -f "$ROOT/overlay/ml4w-juanjo/scripts/cava-toggle.sh" "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
 chmod +x "$DEST/ml4w-juanjo/scripts/cava-toggle.sh"
+cp -f "$ROOT/overlay/ml4w-juanjo/scripts/cava-enlazar-audio.sh" \
+      "$DEST/ml4w-juanjo/scripts/cava-enlazar-audio.sh"
+chmod +x "$DEST/ml4w-juanjo/scripts/cava-enlazar-audio.sh"
 cp -f "$ROOT/overlay/hypr/custom.lua" "$DEST/hypr/custom.lua"
 
 # 8b. Todo lo que cuelga de hypridle. Tres piezas:
