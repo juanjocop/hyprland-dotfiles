@@ -122,6 +122,22 @@ if pgrep -x hypridle >/dev/null; then
   setsid hypridle >/dev/null 2>&1 < /dev/null &
 fi
 
+# 8c. Salida de audio HDMI: fijarla al monitor CON altavoces (ASUS MG278 = DP-2). La tarjeta de
+#     la NVIDIA pone cada conector en un perfil distinto y el del DP-1 (sin altavoces) tiene MÁS
+#     prioridad, así que WirePlumber caía ahí solo cada vez que el ASUS no estaba disponible al
+#     elegir. La regla vive en el namespace de wireplumber (nada que ver con ML4W → cero deriva) y
+#     casa por nombre de producto, así que en el portátil es un no-op. Detalle largo en el fichero.
+mkdir -p "$DEST/wireplumber/wireplumber.conf.d"
+wp_conf="wireplumber/wireplumber.conf.d/51-salida-hdmi-dp2.conf"
+if ! cmp -s "$ROOT/overlay/$wp_conf" "$DEST/$wp_conf"; then
+  cp -f "$ROOT/overlay/$wp_conf" "$DEST/$wp_conf"
+  # Solo reiniciamos si el config cambió DE VERDAD: un restart corta el audio un instante y
+  # aplicar.sh se ejecuta a menudo. Y solo si el servicio está vivo (aplicar.sh corre en TTY).
+  if systemctl --user is-active --quiet wireplumber; then
+    systemctl --user restart wireplumber
+  fi
+fi
+
 # 9. Recargar Hyprland para que entren custom.lua (los binds de cava) y las variantes de
 #    decoración. Imprescindible en un equipo NUEVO: allí custom.lua no existía, y ML4W solo hace
 #    require("custom") si el fichero está — sin recarga los binds no se registran (verificado).

@@ -77,6 +77,7 @@ selector— y poner vídeos en la carpeta si se quiere el fondo de vídeo.
 | **Visualizador de audio (cava)** | Barras al ritmo, en dos modos excluyentes: ventana (**SUPER+SHIFT+C**) y fondo (**SUPER+ALT+C**) | `overlay/cava/` + `overlay/ml4w-juanjo/` + `overlay/hypr/custom.lua` |
 | **Encendido robusto al reanudar** | Evita la pantalla en negro tras suspender: espera a que la sesión esté activa y **cicla** el DPMS con reintentos | `overlay/ml4w-juanjo/scripts/despertar-pantallas.sh` + `overlay/hypr/hypridle.conf` |
 | **Control de inactividad** | Botón 󰅶 desplegable en la barra: desactiva por separado el **bloqueo**, el **apagado de pantallas** y la **suspensión** (para dejar algo trabajando solo). Incluye el **vigilante** que reapaga la DP-1 cuando se enciende sola, y **SUPER+SHIFT+D** para despertar las pantallas a ciegas | `overlay/ml4w-juanjo/scripts/idle-guard.sh` + `overlay/hypr/hypridle.conf` + `overlay/hypr/custom.lua` |
+| **Salida de audio fija al monitor con altavoces** (sobremesa) | Ancla la tarjeta HDMI de la NVIDIA en el conector del **ASUS MG278 (DP-2)**; sin esto WirePlumber se iba solo al **DP-1**, que es mudo | `overlay/wireplumber/wireplumber.conf.d/51-salida-hdmi-dp2.conf` |
 
 ---
 
@@ -569,6 +570,56 @@ barra no sirve, no se ve), hay una **salida de emergencia a ciegas**:
 
 ---
 
+## El sonido se iba solo al monitor mudo (sobremesa)
+
+**Síntoma.** Cada cierto tiempo el audio deja de salir por los altavoces del **ASUS MG278**.
+La barra sigue diciendo que hay salida HDMI y `pactl` la da por `RUNNING`, pero no se oye nada.
+
+**Causa.** La tarjeta de audio de la RTX 5070 Ti (`GB203`) expone **un puerto por conector**, y
+cada puerto vive en un **perfil distinto** — solo uno puede estar activo:
+
+| Perfil | Puerto | Monitor | Prioridad | ¿Altavoces? |
+|---|---|---|---|---|
+| `output:hdmi-stereo` | `hdmi-output-0` | DP-1 · KTC H27E6 | **5900** | **no** |
+| `output:hdmi-stereo-extra1` | `hdmi-output-1` | DP-2 · ASUS MG278 | 5700 | sí |
+
+WirePlumber elige perfil en **tres pasos encadenados**, y se queda con el primero que resuelva:
+
+1. `device/find-stored-profile` — el de `~/.local/state/wireplumber/default-profile`… **pero solo
+   si en ese momento está `available`**.
+2. `device/find-preferred-profile` — el que digan las reglas de `device.profile.priority.rules`.
+3. `device/find-best-profile` — el de **mayor prioridad** disponible.
+
+Si el ASUS no está listo cuando se evalúa —arranque en frío, o la **caída de enlace DP** de estos
+monitores al dormirse (la misma de [issue #1](#pantalla-en-negro-tras-suspender-sobremesa))— el
+paso 1 se salta y manda el paso 3, que por prioridad coge el **DP-1 mudo**. Y ahí se queda.
+Por eso **fijar la salida a mano no aguanta**: el fichero de estado no es la última palabra.
+
+**Arreglo.** Rellenar el paso 2, que hasta ahora estaba vacío:
+`overlay/wireplumber/wireplumber.conf.d/51-salida-hdmi-dp2.conf` pide `output:hdmi-stereo-extra1`
+**por nombre**, sin mirar disponibilidad → gana siempre al paso 3, pase lo que pase con el DP.
+
+Verificado borrando la entrada del fichero de estado y reiniciando WirePlumber: elige `extra1`
+igualmente, en vez del `hdmi-stereo` de mayor prioridad. `check.sh` §6h avisa si algún día no es así.
+
+**Multi-equipo.** La regla casa por `device.product.name = "GB203 …"`, no por ruta PCI (que cambia
+de máquina y no distingue nada más). En el portátil no casa nada → es un no-op.
+
+**Detalles que ahorran tiempo si vuelve:**
+
+- **`pactl set-card-profile` sí persiste, pero no basta.** Guarda en el fichero de estado, y ese
+  fichero lo ignora WirePlumber justo en el caso que rompe (perfil no disponible al evaluar).
+- **La selección automática NO reescribe el estado.** `device/apply-profile` fija el perfil sin
+  `save`, así que el hook de guardado no salta. Si el fichero de estado dice algo raro, lo puso
+  una acción de usuario (`pactl`, un mezclador gráfico…), no el fallback.
+- **Cambiar de perfil mueve los streams a otro sink.** Tras el cambio, lo que estuviera sonando
+  (los `mpv` del fondo de vídeo, por ejemplo) aparece en la salida por defecto. Se devuelven con
+  `pactl move-sink-input <id> <sink>`.
+- **La salida por defecto es cosa aparte.** Aquí solo se elige *qué conector* usa la tarjeta HDMI;
+  cuál es el sink por defecto (cascos HyperX vs. monitor) se sigue cambiando como siempre.
+
+---
+
 ## Estructura del repo
 
 ```
@@ -590,6 +641,7 @@ overlay/                     ← fuente de verdad: solo lo que personalizamos
   fastfetch/logos/*.png              conjunto de logos para la rotación
   ml4w/scripts/ml4w-toggle-hyprsunset  shim: delega el toggle en nightlight.sh
   ml4w/scripts/ml4w-wallpaper          parche: matugen en oscuro aunque el flag diga `true`
+  wireplumber/wireplumber.conf.d/    regla que fija la salida HDMI al monitor con altavoces
 baseline/                    ← copia "virgen" de la base de ML4W (para detectar deriva)
 aplicar.sh · check.sh · capturar-baseline.sh
 00-…03-*.md · CLAUDE.md      ← contexto, decisiones y notas de diseño

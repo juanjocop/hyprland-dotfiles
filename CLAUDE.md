@@ -101,6 +101,14 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
   Moral: if a black screen returns, check `coredumpctl` **before** blaming the driver, and never
   trust `hyprctl monitors` alone — after a DP reconnect its dpms state can lie.
 
+  **HDMI audio**: the NVIDIA card (`GB203`) puts **each connector in a different profile**, and the
+  DP-1 one — **the monitor with no speakers** — has the higher priority (5900 vs 5700), so
+  WirePlumber drifted back to it on its own. The right one is `output:hdmi-stereo-extra1`
+  (`hdmi-output-1` = DP-2 = ASUS MG278). Pinned with a `device.profile.priority.rules` rule in
+  `overlay/wireplumber/wireplumber.conf.d/`, **not** via the state file — WirePlumber ignores the
+  stored profile precisely when the monitor isn't `available`, which is the case that breaks. Full
+  write-up in `README.md`.
+
 Common to both:
 
 - CachyOS (Arch-based), Hyprland WM, **fish** shell. ML4W with the newer **Lua-based**

@@ -30,6 +30,7 @@ OURS=(
   ml4w-juanjo/scripts/despertar-pantallas.sh
   ml4w-juanjo/scripts/idle-guard.sh
   hypr/custom.lua
+  wireplumber/wireplumber.conf.d/51-salida-hdmi-dp2.conf
 )
 for f in "${OURS[@]}"; do
   over="$ROOT/overlay/$f"; live="$LIVE/$f"
@@ -156,6 +157,28 @@ fi
 icon_theme=$(grep -E '^gtk-icon-theme-name=' "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null | cut -d= -f2)
 if [[ -n "$icon_theme" && "${icon_theme,,}" != *-dark ]]; then
   echo "⚠  icon theme GTK = '$icon_theme' (variante clara → iconos de bandeja negros)  → ./aplicar.sh"; status=1
+fi
+
+# 6h. Salida de audio HDMI en el monitor correcto. Solo aplica donde exista la tarjeta de la
+#     GB203 (sobremesa); en el portátil el bloque no entra y no se dice nada. El perfil bueno es
+#     output:hdmi-stereo-extra1 (hdmi-output-1 = DP-2 = ASUS MG278, el que TIENE altavoces); el de
+#     por defecto, output:hdmi-stereo, es el DP-1 y es MUDO. Localizamos la tarjeta por nombre de
+#     producto, no por ruta PCI: dentro del bloque de `pactl list cards` las propiedades salen
+#     antes que `Active Profile`, así que un solo pase de awk basta.
+if command -v pactl >/dev/null; then
+  hdmi_card=""; hdmi_prof=""
+  # `|| true`: si awk no imprime nada (no está esa tarjeta), read devuelve != 0 y set -e mataría
+  # el script antes de llegar al resto de comprobaciones.
+  read -r hdmi_card hdmi_prof < <(pactl list cards 2>/dev/null | awk '
+    /^[ \t]*Name: /                      { card = $2; gb = 0 }
+    /device\.product\.name = "GB203/      { gb = 1 }
+    /^[ \t]*Active Profile: /             { if (gb) { print card, $3; exit } }
+  ') || true
+  if [[ -n "$hdmi_prof" && "$hdmi_prof" != "output:hdmi-stereo-extra1" && "$hdmi_prof" != "off" ]]; then
+    echo "⚠  audio HDMI en perfil '$hdmi_prof' (≠ extra1 → suena por el DP-1, que no tiene altavoces)"
+    echo "   → pactl set-card-profile $hdmi_card output:hdmi-stereo-extra1   (y revisar 51-salida-hdmi-dp2.conf)"
+    status=1
+  fi
 fi
 
 # Carpeta de logos: debe existir y tener ≥1 PNG, o el glob no casa y no habría imagen.
