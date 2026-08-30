@@ -602,8 +602,18 @@ Por eso **fijar la salida a mano no aguanta**: el fichero de estado no es la úl
 Verificado borrando la entrada del fichero de estado y reiniciando WirePlumber: elige `extra1`
 igualmente, en vez del `hdmi-stereo` de mayor prioridad. `check.sh` §6h avisa si algún día no es así.
 
-**Multi-equipo.** La regla casa por `device.product.name = "GB203 …"`, no por ruta PCI (que cambia
-de máquina y no distingue nada más). En el portátil no casa nada → es un no-op.
+**Multi-equipo (verificado, no supuesto).** La regla casa por `device.product.name = "GB203 …"`,
+sin comodines, no por ruta PCI (que cambia de máquina y no distingue nada más). En el **portátil**
+—GP106, y los altavoces colgando de la tarjeta **Intel HDA analógica**— no casa nada, así que el
+fichero es un **no-op**: se probó desplegando esta misma regla con un producto inexistente y
+WirePlumber arranca igual, todas las tarjetas conservan su perfil y el sink por defecto no se mueve.
+Por eso el fichero se despliega en **los dos equipos** (mismo overlay en ambos), sin condicionar
+por hostname.
+
+Aun así `aplicar.sh` lleva **red de seguridad**: los `.conf` de `wireplumber.conf.d/` se fusionan
+en la config global, y un fichero que a esa versión de WirePlumber no le guste dejaría el equipo
+**sin audio ninguno**. Si tras desplegarlo el daemon no arranca, `aplicar.sh` lo retira, reinicia
+WirePlumber y avisa.
 
 **Detalles que ahorran tiempo si vuelve:**
 

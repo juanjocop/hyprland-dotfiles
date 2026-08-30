@@ -134,7 +134,16 @@ if ! cmp -s "$ROOT/overlay/$wp_conf" "$DEST/$wp_conf"; then
   # Solo reiniciamos si el config cambió DE VERDAD: un restart corta el audio un instante y
   # aplicar.sh se ejecuta a menudo. Y solo si el servicio está vivo (aplicar.sh corre en TTY).
   if systemctl --user is-active --quiet wireplumber; then
-    systemctl --user restart wireplumber
+    systemctl --user restart wireplumber || true
+    # Red de seguridad. Los .conf de wireplumber.conf.d/ se fusionan en la config global: si a la
+    # versión de WirePlumber de ESTE equipo no le gustara el fichero, el daemon no arranca y el
+    # equipo se queda SIN AUDIO NINGUNO. Antes que eso, retirarlo y volver al estado anterior.
+    if ! systemctl --user is-active --quiet wireplumber; then
+      rm -f "$DEST/$wp_conf"
+      systemctl --user restart wireplumber || true
+      echo "⚠  WirePlumber no arrancó con $(basename "$wp_conf") → retirado y daemon restaurado."
+      echo "   La salida HDMI no queda fijada; revisar 'journalctl --user -u wireplumber -n 30'."
+    fi
   fi
 fi
 
