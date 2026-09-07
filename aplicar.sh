@@ -147,6 +147,50 @@ if ! cmp -s "$ROOT/overlay/$wp_conf" "$DEST/$wp_conf"; then
   fi
 fi
 
+# 8d. Llavero para las apps Electron (Claude Desktop, VS Code, Chrome...). Dos piezas:
+#     primero el portal Secret, que en Hyprland no lo mapeaba nadie; con él Chromium cifra las
+#     cookies con clave real del llavero en vez de la ofuscación `v10` de clave fija. Detalle
+#     largo en el propio fichero. Namespace ajeno a ML4W (~/.config/xdg-desktop-portal/) → cero
+#     deriva.
+mkdir -p "$DEST/xdg-desktop-portal"
+xdp_conf="xdg-desktop-portal/hyprland-portals.conf"
+if ! cmp -s "$ROOT/overlay/$xdp_conf" "$DEST/$xdp_conf"; then
+  cp -f "$ROOT/overlay/$xdp_conf" "$DEST/$xdp_conf"
+  # Solo si el servicio está vivo: aplicar.sh también debe poder correrse desde un TTY.
+  # Reiniciar el frontend corta cualquier compartición de pantalla en curso, por eso se hace
+  # únicamente cuando el config ha cambiado de verdad.
+  if systemctl --user is-active --quiet xdg-desktop-portal; then
+    systemctl --user restart xdg-desktop-portal || true
+  fi
+fi
+
+#     ESTO es lo que arregla el login de Claude Desktop; el portal de arriba NO basta (probado:
+#     con el portal puesto y sin este flag la app seguía en basic_text). El safeStorage de
+#     Electron va por el os_crypt síncrono, que ignora el portal y elige backend a partir de
+#     $XDG_CURRENT_DESKTOP (KDE→kwallet, GNOME→libsecret, cualquier otra cosa→basic_text).
+#     "Hyprland" cae en "cualquier otra cosa" → basic_text → Electron devuelve
+#     isEncryptionAvailable=false y la app NO guarda el token: login en CADA arranque.
+#     Hay que decirle el backend a mano. Usamos gnome-libsecret (org.freedesktop.secrets →
+#     ksecretd, ya desbloqueado en el login por PAM) y no kwallet6, porque el wallet de kwalletd6
+#     arranca CERRADO y pediría contraseña.
+#     El lanzador se REGENERA desde el del paquete en cada pase en vez de versionar una copia:
+#     así un update de claude-desktop no nos deja un .desktop viejo. ~/.local/share gana sobre
+#     /usr/share, de modo que el override sobrevive a las actualizaciones.
+sys_desktop="/usr/share/applications/com.anthropic.Claude.desktop"
+usr_desktop="$HOME/.local/share/applications/com.anthropic.Claude.desktop"
+if [[ -f "$sys_desktop" ]]; then
+  mkdir -p "$(dirname "$usr_desktop")"
+  tmp_desktop=$(mktemp)
+  sed -E 's|^Exec=claude-desktop\b|Exec=claude-desktop --password-store=gnome-libsecret|' \
+      "$sys_desktop" > "$tmp_desktop"
+  if ! cmp -s "$tmp_desktop" "$usr_desktop"; then
+    mv -f "$tmp_desktop" "$usr_desktop"
+    update-desktop-database "$(dirname "$usr_desktop")" >/dev/null 2>&1 || true
+  else
+    rm -f "$tmp_desktop"
+  fi
+fi
+
 # 9. Recargar Hyprland para que entren custom.lua (los binds de cava) y las variantes de
 #    decoración. Imprescindible en un equipo NUEVO: allí custom.lua no existía, y ML4W solo hace
 #    require("custom") si el fichero está — sin recarga los binds no se registran (verificado).

@@ -630,6 +630,63 @@ WirePlumber y avisa.
 
 ---
 
+## Claude Desktop pedía login en cada arranque
+
+**Síntoma.** Abrir la app de Claude y encontrarse siempre la pantalla de login, por mucho que se
+hubiera entrado la vez anterior.
+
+**Causa.** Las apps Electron guardan sus credenciales con `safeStorage`, que necesita una clave
+maestra del llavero del sistema. Chromium elige el backend del llavero mirando
+`$XDG_CURRENT_DESKTOP`: `KDE`→kwallet, `GNOME`/`Unity`/…→libsecret, y **cualquier otra cosa→
+`basic_text`**. `Hyprland` cae en "cualquier otra cosa". Con `basic_text` Electron devuelve
+`isEncryptionAvailable=false` y la app directamente **no guarda el token**. Lo dice ella misma en
+`~/.config/Claude/logs/main.log`:
+
+```
+[safeStorage] isEncryptionAvailable=false on linux at startup (backend=basic_text)
+[oauth-v2] safeStorage not available, tokens will not persist
+```
+
+Que aparezca de vez en cuando un `[safeStorage] kwalletd pre-flight (kwalletd6): has-wallet` y esa
+vez sí funcione es la parte que despista: la app intenta detectar kwallet por su cuenta, pero
+depende de que `kwalletd6` esté ya levantado en ese instante, así que unos arranques cuelan y
+otros no. **No es intermitencia del llavero, es una carrera.**
+
+**Arreglo (dos piezas, y solo una de ellas es la que cierra el caso).**
+
+1. **`--password-store=gnome-libsecret` en el lanzador** — *esta es la que lo arregla*. Se le dice
+   el backend a mano y se acabó la adivinación. Va por `gnome-libsecret`
+   (`org.freedesktop.secrets` → `ksecretd`, que CachyOS ya desbloquea en el login vía
+   `ksecretd --pam-login`) y **no** por `kwallet6`, porque el wallet de `kwalletd6` arranca
+   **cerrado** y pediría contraseña. `aplicar.sh` §8d **regenera** el `.desktop` en
+   `~/.local/share/applications/` a partir del del paquete en cada pase, en vez de versionar una
+   copia: así una actualización de `claude-desktop` no nos deja un lanzador viejo, y `~/.local/share`
+   gana sobre `/usr/share`.
+2. **El portal Secret mapeado a kwallet** (`overlay/xdg-desktop-portal/hyprland-portals.conf`) —
+   esta **no** arregla el login. Verificado: con el portal puesto y sin el flag, la app seguía en
+   `basic_text`, porque `safeStorage` va por el os_crypt **síncrono**, que ni mira el portal. Lo
+   que sí arregla es el os_crypt **asíncrono**, por donde Chromium cifra las **cookies**: en
+   Hyprland la interfaz `org.freedesktop.portal.Secret` no la servía nadie (`kwallet.portal` viene
+   con `UseIn=kde` y `hyprland-portals.conf` no lo mapea), así que las cookies caían al esquema
+   `v10`, ofuscación con clave fija. Se queda porque beneficia a **toda** app Chromium/Electron de
+   la máquina. Se comprueba en `~/.config/Claude/Local State`:
+   `os_crypt.portal.prev_init_success` pasa de `false` a `true`.
+
+Cuidado con el fichero de portales: **xdg-desktop-portal no fusiona configs**, usa el primero que
+encuentra y `~/.config` gana sobre `/usr/share` → hay que repetir el `default=hyprland;gtk` del
+sistema o se pierden captura de pantalla, file chooser, etc.
+
+**Cómo se comprueba.** `check.sh` §6i mira dos cosas: que el lanzador lleve el `--password-store`
+y que en el **último** arranque de la app (desde su última línea `Starting app`) no aparezca
+`isEncryptionAvailable=false`. Acotar al último arranque es importante: la app solo escribe esa
+línea cuando falla, así que buscarla en todo el log daría un falso positivo con cualquier arranque
+viejo y roto.
+
+**Después de aplicarlo hay que entrar una vez más** — el token que hubiera guardado en claro no se
+puede releer ya cifrado (`[oauth] no persisted token cache found`). A partir de ahí, aguanta.
+
+---
+
 ## Estructura del repo
 
 ```
@@ -652,6 +709,7 @@ overlay/                     ← fuente de verdad: solo lo que personalizamos
   ml4w/scripts/ml4w-toggle-hyprsunset  shim: delega el toggle en nightlight.sh
   ml4w/scripts/ml4w-wallpaper          parche: matugen en oscuro aunque el flag diga `true`
   wireplumber/wireplumber.conf.d/    regla que fija la salida HDMI al monitor con altavoces
+  xdg-desktop-portal/hyprland-portals.conf  portal Secret → kwallet (cifrado de cookies)
 baseline/                    ← copia "virgen" de la base de ML4W (para detectar deriva)
 aplicar.sh · check.sh · capturar-baseline.sh
 00-…03-*.md · CLAUDE.md      ← contexto, decisiones y notas de diseño

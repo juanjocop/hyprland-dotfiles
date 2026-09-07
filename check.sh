@@ -31,6 +31,7 @@ OURS=(
   ml4w-juanjo/scripts/idle-guard.sh
   hypr/custom.lua
   wireplumber/wireplumber.conf.d/51-salida-hdmi-dp2.conf
+  xdg-desktop-portal/hyprland-portals.conf
 )
 for f in "${OURS[@]}"; do
   over="$ROOT/overlay/$f"; live="$LIVE/$f"
@@ -178,6 +179,30 @@ if command -v pactl >/dev/null; then
     echo "⚠  audio HDMI en perfil '$hdmi_prof' (≠ extra1 → suena por el DP-1, que no tiene altavoces)"
     echo "   → pactl set-card-profile $hdmi_card output:hdmi-stereo-extra1   (y revisar 51-salida-hdmi-dp2.conf)"
     status=1
+  fi
+fi
+
+# 6i. Llavero de las apps Electron. Dos piezas independientes, las dos necesarias:
+#     a) el portal Secret mapeado a kwallet (lo despliega aplicar.sh vía hyprland-portals.conf);
+#     b) --password-store=gnome-libsecret en el lanzador de Claude Desktop, porque el safeStorage
+#        de Electron NO usa el portal: deduce el backend de $XDG_CURRENT_DESKTOP y "Hyprland" no
+#        está en su lista → cae a basic_text, isEncryptionAvailable=false y la app pide login en
+#        CADA arranque. El lanzador lo regenera aplicar.sh desde el del paquete.
+usr_desktop="$HOME/.local/share/applications/com.anthropic.Claude.desktop"
+if [[ -f /usr/share/applications/com.anthropic.Claude.desktop ]]; then
+  if ! grep -q -- '--password-store=' "$usr_desktop" 2>/dev/null; then
+    echo "⚠  el lanzador de Claude Desktop no fuerza el llavero  → ./aplicar.sh (o volverá a pedir login en cada arranque)"; status=1
+  fi
+  # El síntoma de verdad, dicho por la propia app en su log. Solo se queja cuando falla, así que
+  # hay que acotar al ÚLTIMO arranque ("Starting app"): si ahí no aparece la línea, es que fue
+  # bien. Buscar en todo el log daría falso positivo con cualquier arranque viejo y roto.
+  claude_log="$HOME/.config/Claude/logs/main.log"
+  if [[ -f "$claude_log" ]]; then
+    ln_boot=$(grep -n 'Starting app' "$claude_log" | tail -1 | cut -d: -f1)
+    if [[ -n "$ln_boot" ]] && awk -v n="$ln_boot" 'NR>=n' "$claude_log" \
+         | grep -q 'isEncryptionAvailable=false'; then
+      echo "⚠  último arranque de Claude Desktop sin cifrado (backend basic_text)  → cerrarla y reabrirla desde el lanzador tras ./aplicar.sh"; status=1
+    fi
   fi
 fi
 

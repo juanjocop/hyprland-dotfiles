@@ -166,6 +166,16 @@ Two things worth knowing when debugging this class of bug:
 
 `check.sh` §6c/§6d now detect both regressions, so the workflow catches a recurrence.
 
+### Electron en Hyprland no encuentra el llavero (don't re-derive)
+
+`safeStorage` de Electron elige backend por `$XDG_CURRENT_DESKTOP`; `Hyprland` no está en la
+lista de Chromium → `basic_text` → `isEncryptionAvailable=false` → **la app no persiste
+credenciales** (Claude Desktop pedía login en cada arranque). El arreglo es
+`--password-store=gnome-libsecret` en el lanzador, que `aplicar.sh` §8d **regenera** desde el
+`.desktop` del paquete. El portal Secret (`overlay/xdg-desktop-portal/`) es una pieza aparte:
+**no** arregla `safeStorage` (verificado), solo el cifrado de cookies. Write-up completo en
+`README.md`; `check.sh` §6i lo vigila.
+
 ## Working rules
 
 - **Never edit the live config by hand.** All customizations go into `overlay/`, then deploy
