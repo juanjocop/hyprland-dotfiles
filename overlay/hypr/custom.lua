@@ -75,3 +75,28 @@ hl.window_rule({
     match = { class = "code-oss" },
     opacity = "0.95 override 0.88 override",
 })
+
+-- Unreal Editor (UE 5.8, binario de Epic, lanzado con ~/.local/bin/ue5). Ver decisión 53 en
+-- ~/Proyectos/UmbraSolaris/docs/decisions.md.
+--
+-- El editor de la 5.8 es SDL 3 con backend Wayland NATIVO (verificado: `Using SDL video driver
+-- 'wayland'`, sin XWayland). Todas sus ventanas comparten el app_id `UnrealEditor` (splash,
+-- Project Browser, diálogos, pestañas arrancadas, ventana principal). Tilar todo eso es un incordio (el splash y los diálogos se estiran a media
+-- pantalla), así que la regla base FLOTA todo `UnrealEditor` y una segunda regla, posterior
+-- (gana por orden), vuelve a TILAR únicamente la ventana principal, que se distingue por el
+-- título `<Proyecto> - Unreal Editor` (verificado con `hyprctl clients`: class=UnrealEditor,
+-- title="SmokeTest - Unreal Editor", xwayland=false, floating=false). Los menús desplegables y
+-- tooltips son popups de xdg-shell: Hyprland no los tila y no necesitan regla.
+--
+-- Los `match` son regex RE2 (Rule.hpp → RegexMatchEngine), NO globs: por eso van anclados.
+-- Si tras el primer arranque algún título real no encaja, se ajusta con `hyprctl clients`.
+hl.window_rule({
+    name = "unreal-editor-secondary-float",
+    match = { class = "^UnrealEditor$" },
+    float = true,
+})
+hl.window_rule({
+    name = "unreal-editor-main-tile",
+    match = { class = "^UnrealEditor$", title = "^.* - Unreal Editor.*$" },
+    tile = true,
+})
