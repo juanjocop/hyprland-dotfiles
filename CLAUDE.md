@@ -77,9 +77,9 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
   integrated Radeon iGPU, `amdgpu`) + **NVIDIA RTX 5070 Ti** (Blackwell, open kernel module
   driver `610.x`). The **monitors hang off the NVIDIA** (card1: DP-1 240Hz + DP-2); the AMD
   iGPU has nothing plugged in, so `amdgpu ... Cannot find any crtc or sizes` in the journal
-  is **benign noise**. The **black screen after the monitors slept is two separate bugs with the
-  same symptom** — don't conflate them; `coredumpctl list` tells them apart (full write-up in
-  `README.md` and issue #1):
+  is **benign noise**. The **black screen after the monitors slept is three distinct failures with
+  the same symptom** — don't conflate them; `coredumpctl list` separates the first from the other
+  two, and our own log separates those (full write-up in `README.md` and issue #1):
   - **Hyprland *dies*** → aquamarine 0.13.0 SIGSEGV in `SDRMConnector::releaseCommitBuffers`.
     Fixed upstream by `c0bd9ed`, shipped in **aquamarine 0.14.0** (installed 2026-07-29).
   - **Hyprland *survives*, screen still black** → the outputs stay disabled and nothing re-enables
@@ -90,6 +90,15 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
     is still disabled — so a plain enable is a **no-op**. Ours waits for the session and *cycles*
     dpms with retries: `overlay/ml4w-juanjo/scripts/despertar-pantallas.sh`, wired in from our
     `overlay/hypr/hypridle.conf`. Leaves a log in `~/.cache/ml4w-juanjo/`.
+  - **The enable *worked* and one monitor is still black** ("victoria falsa", seen 2026-09-09
+    11:25). Same DP link drop, but landing **just after** the enable: DP-1 lit up, dropped the
+    link and **vanished from the monitor list**. Fingerprint is in *our* log, not Hyprland's —
+    `ciclo 1 → DP-2=1` where every good resume reads `ciclo 1 → DP-2=1 DP-1=1`. The old success
+    test asked "are all the monitors I can *see* on?", which is **vacuously true** when one is
+    gone; it then wrote the `$SELLO`, and the sello is what cancels the `on-resume` second
+    chance. Fixed: success is measured against an explicit **expected-monitor list** (seeded from
+    what's present plus the last good run, only ever grows, polls up to 8 s for a straggler), and
+    the log now marks `DP-1=AUSENTE` / `DP-1=!1` (present but connector disabled).
 
   The **same DP link drop has a second consequence, on the way *out***: when DP-1 (the KTC H27E6)
   reasserts HPD, Hyprland treats it as a **new** monitor and **modesets** it — which lights the
@@ -99,7 +108,9 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
   or it would undo the resume and reproduce issue #1. Full write-up in `README.md`.
 
   Moral: if a black screen returns, check `coredumpctl` **before** blaming the driver, and never
-  trust `hyprctl monitors` alone — after a DP reconnect its dpms state can lie.
+  trust `hyprctl monitors` alone — after a DP reconnect its dpms state can lie, the short form
+  **hides disabled connectors** (use `hyprctl monitors all`), and a monitor that is *absent* is
+  never a monitor that is *on*.
 
   **HDMI audio**: the NVIDIA card (`GB203`) puts **each connector in a different profile**, and the
   DP-1 one — **the monitor with no speakers** — has the higher priority (5900 vs 5700), so
