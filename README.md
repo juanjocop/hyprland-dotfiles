@@ -407,13 +407,39 @@ dos motivos:
   (verificado: DP-1 desaparece de `hyprctl monitors` y reaparece solo). Al reconectar se recrean
   como monitor nuevo con `dpms=true`, mientras el conector sigue deshabilitado por debajo →
   `dpms enable` se convierte en un **no-op**.
+- **Victoria falsa** (visto el 2026-09-09, 11:25). El mismo tirón de enlace puede caer **justo
+  después** de encender: la DP-1 se enciende, tira el enlace y **desaparece** de la lista de
+  monitores. La comprobación de éxito de entonces era "¿están encendidas todas las que veo?", que
+  con la DP-1 ausente sale **verdadera de forma vacía**. El log lo canta comparado con cualquier
+  reanudación buena:
+
+  ```
+  ciclo 1 → DP-2=1 DP-1=1      ← bien
+  ciclo 1 → DP-2=1             ← el fallo: la DP-1 no está, y aun así "OK en el ciclo 1"
+  ```
+
+  Peor aún: al darlo por bueno escribía el `$SELLO`, y el sello **anula la segunda oportunidad**
+  del `on-resume`. La DP-1 se quedó negra.
 
 Por eso `despertar-pantallas.sh` **espera** a que la sesión esté activa y luego **cicla** el DPMS
 (apagar + encender) con reintentos, en vez de solo encender. El ciclo es incondicional a
 propósito: consultar el estado y decidir "ya están bien" sería caer justo en el segundo motivo.
 
+Y por eso el éxito se mide contra una **lista concreta** de monitores exigidos, no contra los que
+haya en pantalla en ese instante. Dos reglas que no hay que re-derivar:
+
+- **Siempre `hyprctl monitors all`, nunca `hyprctl monitors` a secas.** La forma corta **oculta
+  los conectores deshabilitados**, que es exactamente el estado del fallo. Preguntar por la lista
+  corta es preguntarle al problema si hay problema.
+- **Un monitor ausente nunca cuenta como encendido.** La lista se siembra con los monitores
+  presentes al empezar más los del último encendido bueno (`despertar-pantallas.monitores`), solo
+  crece durante los ciclos, y el script **sondea hasta 8 s** a que el ausente rehaga su enlace DP.
+  Lo que de verdad ya no está (cable fuera) se poda al final, con su línea en el log, para no
+  arrastrar un `hyprctl reload` en cada reanudación.
+
 Deja rastro en `~/.cache/ml4w-juanjo/despertar-pantallas.log`, que es lo primero que hay que
-mirar si el negro reaparece.
+mirar si el negro reaparece. Ahí, `DP-1=AUSENTE` significa que no está en la lista y `DP-1=!1`
+que está pero con el conector deshabilitado.
 
 ---
 

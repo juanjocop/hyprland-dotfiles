@@ -22,8 +22,20 @@
 #       es un no-op: Hyprland cree que ya están encendidas.  → aquí CICLAMOS (apagar + encender)
 #       en vez de solo encender, que fuerza una transición real.
 #
+#   (c) VICTORIA FALSA. El tirón de enlace del caso (b) también puede caer JUSTO DESPUÉS de
+#       encender: la DP-1 se enciende, tira el enlace y DESAPARECE de la lista de monitores.
+#       Con la comprobación de antes ("¿están encendidos todos los que veo?") eso daba
+#       verdadero de forma VACÍA — solo quedaba la DP-2, y estaba a 1. Ocurrió el 2026-09-09 a
+#       las 11:25: `ciclo 1 → DP-2=1` (compáralo con el `DP-2=1 DP-1=1` de todas las veces que
+#       salió bien). El script cantó "OK", escribió el $SELLO y con él anuló la segunda
+#       oportunidad del `on-resume`. La DP-1 se quedó negra.  → aquí exigimos una LISTA CONCRETA
+#       de monitores ($ESPERADOS) y esperamos a que el ausente reasome; un monitor que falta
+#       nunca cuenta como encendido.
+#
 # Por eso el ciclo es incondicional: en el caso (b) `hyprctl monitors` MIENTE, así que consultar
-# el estado y decidir "ya están bien, no toco nada" sería justo el error que causa el bug.
+# el estado y decidir "ya están bien, no toco nada" sería justo el error que causa el bug. Y por
+# eso el éxito se mide contra $ESPERADOS y con `hyprctl monitors all`: en el caso (c) la lista
+# corta OMITE al monitor problemático, así que preguntar por ella es no preguntar nada.
 #
 # Que enable funciona con la sesión activa está verificado: en la prueba del 31-07 recuperó las
 # dos pantallas en menos de 2 s. Lo que fallaba era CUÁNDO y CUÁNTAS VECES se llamaba.
@@ -38,7 +50,9 @@ set -uo pipefail   # sin -e a propósito: ningún fallo suelto debe abortar el r
 LOG="$HOME/.cache/ml4w-juanjo/despertar-pantallas.log"
 SELLO="$HOME/.cache/ml4w-juanjo/despertar-pantallas.stamp"
 PID_VIGILANTE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ml4w-juanjo/inactividad/vigilante.pid"
+ESPERADOS_F="$HOME/.cache/ml4w-juanjo/despertar-pantallas.monitores"
 ESPERA_SESION=15   # s máximos esperando a que logind reactive la sesión
+ESPERA_MONITOR=8   # s máximos esperando a que un monitor ausente rehaga su enlace DP
 INTENTOS=3
 VENTANA=30         # s durante los que NO se repite un encendido que ya salió bien
 
@@ -51,19 +65,79 @@ log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
 
 dpms() { hyprctl dispatch "hl.dsp.dpms({ action = \"$1\" })" >/dev/null 2>&1; }
 
+# SIEMPRE `hyprctl monitors all`, NUNCA `hyprctl monitors` a secas (no re-derivar): la forma
+# corta OCULTA los conectores deshabilitados, que es justo el estado del fallo que este script
+# existe para arreglar. Preguntar por la lista corta es preguntarle al problema si hay problema.
+monitores() { hyprctl monitors all 2>/dev/null; }
+
+# Nombres de los monitores presentes, uno por línea.
+nombres_monitores() { monitores | awk '$1 == "Monitor" { print $2 }'; }
+
 # Resumen legible del estado, solo para el log. Sin jq: no está garantizado en las dos máquinas.
+# `dpmsStatus` aparece ANTES que `disabled` dentro de cada bloque, así que hay que acumular y
+# volcar al empezar el bloque siguiente. Un `!` delante marca conector deshabilitado, y un
+# `AUSENTE` marca un monitor que esperábamos y que ahora mismo no está en la lista.
 estado() {
-    hyprctl monitors 2>/dev/null \
-        | awk '/^Monitor /{n=$2} /dpmsStatus:/{printf "%s=%s ", n, $2} END{print ""}'
+    local salida m linea=""
+    salida=$(monitores)
+    linea=$(awk '
+        $1 == "Monitor"    { if (n != "") printf "%s=%s%s ", n, d, s; n=$2; d=""; s="?"; next }
+        $1 == "dpmsStatus:"                   { s=$2 }
+        $1 == "disabled:" && $2 == "true"     { d="!" }
+        END { if (n != "") printf "%s=%s%s ", n, d, s }' <<< "$salida")
+    for m in $ESPERADOS; do
+        grep -q "^Monitor $m " <<< "$salida" || linea+="$m=AUSENTE "
+    done
+    printf '%s' "$linea"
 }
 
-# ¿Todos los monitores encendidos? Devuelve falso también si no hay ninguno (sesión sin salida).
+# ¿Un monitor concreto está realmente encendido? Las TRES cosas, y las tres importan:
+# presente en la lista, conector habilitado y DPMS a 1.
+monitor_encendido() {   # $1 = salida de `monitores`, $2 = nombre
+    awk -v mon="$2" '
+        $1 == "Monitor" && $2 == mon                  { visto=1; dentro=1; ok=1; next }
+        $1 == "Monitor"                               { dentro=0 }
+        dentro && $1 == "dpmsStatus:" && $2 != 1      { ok=0 }
+        dentro && $1 == "disabled:"   && $2 == "true" { ok=0 }
+        END { exit !(visto && ok) }' <<< "$1"
+}
+
+# ¿Están encendidos TODOS los que esperamos? Ojo con la tentación de preguntar "¿están encendidos
+# todos los que veo?": eso es lo que había antes y es una comprobación VACÍA cuando un monitor se
+# ha ido. Pasó el 2026-09-09 a las 11:25 — la DP-1 tiró el enlace DP justo después del encendido,
+# desapareció de la lista, y el script vio `DP-2=1`, cantó "OK en el ciclo 1", escribió el sello y
+# con él se cargó la segunda oportunidad del `on-resume`. La DP-1 se quedó negra.
 todas_encendidas() {
-    local out n on
-    out=$(hyprctl monitors 2>/dev/null) || return 1
-    n=$(grep -c '^Monitor ' <<< "$out")
-    on=$(grep -c 'dpmsStatus: 1' <<< "$out")
-    [[ "$n" -gt 0 && "$n" -eq "$on" ]]
+    local salida m
+    [[ -n "${ESPERADOS// /}" ]] || return 1   # sin lista no hay nada que dar por bueno
+    salida=$(monitores) || return 1
+    for m in $ESPERADOS; do
+        monitor_encendido "$salida" "$m" || return 1
+    done
+    return 0
+}
+
+# ── La lista de monitores exigidos ───────────────────────────────────────────────────────────
+# $VISTOS  = los que han aparecido en algún momento de ESTA ejecución.
+# $ESPERADOS = $VISTOS + los que había la última vez que esto salió bien ($ESPERADOS_F). Lo
+# segundo cubre el caso de que el monitor esté en su ventana de desconexión ya al arrancar
+# nosotros: si no lo recordáramos, ni siquiera sabríamos que falta.
+# La lista solo CRECE durante los ciclos: un monitor que desaparece sigue siendo exigido, que es
+# precisamente lo que faltaba. Lo que ya no está de verdad se poda al final (ver el paso 2.b).
+VISTOS=""
+ESPERADOS=""
+
+anadir() {   # $1 = lista (por nombre de variable), $2 = elemento
+    local -n lista="$1"
+    [[ " $lista " == *" $2 "* ]] || lista+=" $2"
+}
+
+mirar_monitores() {
+    local m
+    for m in $(nombres_monitores); do
+        anadir VISTOS "$m"
+        anadir ESPERADOS "$m"
+    done
 }
 
 sesion_activa() {
@@ -80,7 +154,13 @@ sesion_activa() {
 # Marca de "encendido que salió bien". Se escribe SOLO al terminar con éxito, nunca al empezar:
 # así un intento fallido no bloquea al siguiente, que es justo la segunda oportunidad que da
 # `on-resume` cuando el usuario toca el ratón.
-exito() { : > "$SELLO"; }
+exito() {
+    : > "$SELLO"
+    # Guardamos los monitores del encendido bueno para poder exigirlos la próxima vez aunque
+    # lleguen tarde. Se escribe la lista REAL de ahora, no $ESPERADOS: así una entrada podada
+    # en el paso 2.b (un monitor que ya no está) no vuelve a colarse.
+    nombres_monitores > "$ESPERADOS_F" 2>/dev/null
+}
 reciente() {
     [[ -f "$SELLO" ]] || return 1
     local edad=$(( $(date +%s) - $(stat -c %Y "$SELLO" 2>/dev/null || echo 0) ))
@@ -118,8 +198,14 @@ while (( esperado < ESPERA_SESION )); do
     sleep 1
     (( esperado++ ))
 done
+# 1.b Sembrar la lista de monitores exigidos: los de ahora + los del último encendido bueno.
+mirar_monitores
+if [[ -r "$ESPERADOS_F" ]]; then
+    while read -r m; do [[ -n "$m" ]] && anadir ESPERADOS "$m"; done < "$ESPERADOS_F"
+fi
+
 if sesion_activa; then
-    log "sesión activa tras ${esperado}s; estado: $(estado)"
+    log "sesión activa tras ${esperado}s; exijo:${ESPERADOS:- (nada)}; estado: $(estado)"
 else
     log "AVISO: la sesión sigue inactiva tras ${ESPERA_SESION}s; lo intento igualmente"
 fi
@@ -130,6 +216,15 @@ for (( i = 1; i <= INTENTOS; i++ )); do
     sleep 1
     dpms enable
     sleep 2
+    # Sondeo en vez de una espera fija: tras el encendido la DP-1 puede volver a tirar el
+    # enlace y tardar unos segundos en reasomar (al reconectar, Hyprland le hace modeset y eso
+    # ya la enciende). Dormir a ciegas y mirar una sola vez es cómo se nos escapó la del 11:25.
+    for (( t = 0; t < ESPERA_MONITOR; t++ )); do
+        mirar_monitores          # un monitor que reaparece vuelve a la lista de exigidos
+        todas_encendidas && break
+        sleep 1
+    done
+    mirar_monitores
     log "ciclo $i → $(estado)"
     if todas_encendidas; then
         log "OK en el ciclo $i"
@@ -137,6 +232,22 @@ for (( i = 1; i <= INTENTOS; i++ )); do
         exit 0
     fi
 done
+
+# 2.b Podar lo que ya no está. Si lo único que falla es un monitor de la lista GUARDADA que no ha
+#     aparecido ni una vez en toda la ejecución, es que ya no está (cable fuera, monitor apagado
+#     de verdad). Arrastrarlo significaría fallar y hacer un `hyprctl reload` en cada reanudación,
+#     para siempre. Se le retira y la lista se autocorrige sola en el siguiente encendido bueno.
+if [[ "$ESPERADOS" != "$VISTOS" ]]; then
+    for m in $ESPERADOS; do
+        [[ " $VISTOS " == *" $m "* ]] || log "«$m» no ha aparecido en toda la reanudación; lo retiro de la lista"
+    done
+    ESPERADOS="$VISTOS"
+    if todas_encendidas; then
+        log "OK una vez retirados los monitores que ya no están"
+        exito
+        exit 0
+    fi
+fi
 
 # 3. Último cartucho: recargar la config, que reaplica las reglas de monitor.
 log "los $INTENTOS ciclos no bastaron; probando hyprctl reload"
