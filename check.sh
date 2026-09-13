@@ -29,6 +29,7 @@ OURS=(
   ml4w-juanjo/scripts/cava-enlazar-audio.sh
   ml4w-juanjo/scripts/despertar-pantallas.sh
   ml4w-juanjo/scripts/idle-guard.sh
+  ml4w-juanjo/hypridle-vuelta.conf
   hypr/custom.lua
   wireplumber/wireplumber.conf.d/51-salida-hdmi-dp2.conf
   xdg-desktop-portal/hyprland-portals.conf
@@ -129,7 +130,9 @@ else
 fi
 
 # 6f. hypridle tiene que estar corriendo, o no hay ni bloqueo ni suspensión ni reanudación.
-if ! pgrep -x hypridle >/dev/null; then
+#     `-fx hypridle`: el de la SESIÓN, sin argumentos. El detector de vuelta de un apagado en curso
+#     también se llama hypridle y con `-x` lo daría por bueno aunque el de la sesión hubiera muerto.
+if ! pgrep -fx hypridle >/dev/null; then
   echo "⚠  hypridle NO está corriendo  → ./aplicar.sh"; status=1
 fi
 

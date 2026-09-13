@@ -533,9 +533,10 @@ falta `socat` ni `nc -U`, que no están garantizados en las dos máquinas.
    lo apagamos esto sería un ping-pong de parpadeos; tras 3 intentos se rinde, y entonces **borra la
    marca y llama a `despertar-pantallas.sh` para encenderlo todo**, con el motivo en el log.
    *Medido en 7 ciclos reales: normalmente `reaplico apagado (1/3)` y nunca una segunda vez.*
-2. **Muere solo** si desaparece la marca, si `hyprctl` no contesta —hereda
-   `HYPRLAND_INSTANCE_SIGNATURE`, así que **solo puede tocar su propia sesión** de Hyprland— o a
-   las 8 h.
+2. **Muere solo** si desaparece la marca o si `hyprctl` no contesta —hereda
+   `HYPRLAND_INSTANCE_SIGNATURE`, así que **solo puede tocar su propia sesión** de Hyprland—. A las
+   8 h deja de reaplicar el apagado, pero **sigue vivo mientras viva el detector de vuelta** (ver
+   [más abajo](#el-aviso-de-vuelta-que-se-perdía-hypridle208)), que es suyo.
 3. **`despertar-pantallas.sh` lo mata nada más empezar.** Es lo crítico: al volver de una
    suspensión las pantallas se encienden con la marca de apagado **todavía puesta**, y un vigilante
    vivo desharía ese encendido → el fondo negro de la issue #1 otra vez. Quien manda al encender es
@@ -565,21 +566,85 @@ La evidencia, en el `hyprland.log` de la sesión:
 - 470 `atomic drm request: failed to commit: Device or resource busy` concentrados exactamente en la
   franja del ping-pong.
 
-**Sospecha, no demostrada:** el trasiego de desconexión/reconexión de la DP-1 recrea la notificación
-de idle del compositor y hypridle re-arma el `on-timeout` contra un objeto obsoleto, perdiendo el
-`resumed`. Misma familia que el «`hyprctl monitors` miente tras una reconexión DP». Confirmarlo
-exigiría relanzar hypridle capturando su salida — el lanzador de ML4W la manda a `/dev/null`.
+**La sospecha de entonces era equivocada:** se culpó a la reconexión de la DP-1, que recrearía la
+notificación de idle. Pero esa reconexión ocurre en *todos* los apagados, también en los que
+despiertan bien, y las notificaciones de idle de Hyprland no dependen de los monitores. La causa
+real apareció el 2026-09-13: ver [El aviso de vuelta que se perdía](#el-aviso-de-vuelta-que-se-perdía-hypridle208).
 
-**La moraleja de diseño no depende de resolver esa incógnita:** no se puede confiar en que el aviso
-de vuelta llegue, así que el vigilante **no puede irse dejando pantallas muertas**. Si el apagado no
-se puede sostener, lo único coherente es encenderlo todo.
+**La moraleja de diseño sigue en pie:** no se puede confiar en que el aviso de vuelta llegue, así que
+el vigilante **no puede irse dejando pantallas muertas**. Si el apagado no se puede sostener, lo
+único coherente es encenderlo todo.
 
-Y por si aun así te quedas a oscuras (las dos apagadas y el `on-resume` perdido: ahí el botón de la
-barra no sirve, no se ve), hay una **salida de emergencia a ciegas**:
+Y por si aun así te quedas a oscuras (ahí el botón de la barra no sirve, no se ve), hay una **salida
+de emergencia a ciegas**. Desde el detector de vuelta no debería hacer falta; queda como red por
+debajo de la red:
 
 | Tecla | Qué hace |
 |---|---|
-| **SUPER+SHIFT+D** | Despierta las pantallas a mano. Es la misma acción que el `on-resume` de hypridle: para al vigilante, borra la marca y cicla el DPMS con reintentos. Inofensiva con las pantallas ya encendidas (sin marca no cicla nada). |
+| **SUPER+SHIFT+D** | Despierta las pantallas a mano. Es la misma acción que el `on-resume` de hypridle: para al vigilante (y al detector), borra la marca y cicla el DPMS con reintentos. Inofensiva con las pantallas ya encendidas (sin marca no cicla nada). |
+
+### El aviso de vuelta que se perdía (hypridle#208)
+
+**2026-09-13.** Las **dos** pantallas negras al volver al equipo, y hubo que entrar por un TTY.
+Hyprland estaba sano (sin coredump, y su log DRM idéntico al de los seis apagados anteriores, que sí
+despertaron), y el vigilante **seguía vivo media hora después**: `pantallas-on` no llegó a
+ejecutarse nunca. No es ninguno de los fallos de la [pantalla en negro tras
+suspender](#pantalla-en-negro-tras-suspender-sobremesa): aquí no hubo suspensión.
+
+**La causa está en el código de hypridle** (0.1.8, idéntico en `main`; bug abierto
+[hyprwm/hypridle#208](https://github.com/hyprwm/hypridle/issues/208)):
+
+1. Cuando el contador de inhibidores de hypridle (DBus `org.freedesktop.ScreenSaver` o el `idle` de
+   logind) **baja a 0 estando ya inactivo**, `CHypridle::onInhibit()` **destruye y recrea** todas sus
+   notificaciones de idle.
+2. Hyprland solo manda `resumed` a una notificación que había llegado a `idled`
+   (`CExtIdleNotification::reset()`). La recreada aún no ha llegado, así que la actividad real **no la
+   despierta**: el `on-resume` del listener de 11 min no llega nunca.
+3. Si tras la recreación pasan otros 11 min sin tocar nada, **vuelve a saltar `pantallas-off`**. Es la
+   firma exacta del 2026-08-06: dos apagados seguidos sin un `on-resume` entre medias.
+
+Quien sube y baja ese contador es cualquier navegador con vídeo o audio (Wake Lock), así que pasa sin
+hacer nada raro. Y el vigilante no lo salvaba: con una sola reencendida de la DP-1 no llega a
+rendirse, así que nada iba a encender las pantallas en 8 h.
+
+**Reproducido en el sobremesa**, con dos hypridle de prueba a la vez (listener de 3 s) y la actividad
+generada por un teclado virtual (`zwp_virtual_keyboard_v1`, que llega a Hyprland aunque la sesión esté
+en otro TTY):
+
+| Momento | Hypridle que obedece inhibidores (como el de la sesión) | El detector (`hypridle-vuelta.conf` real) |
+|---|---|---|
+| Tecla de control | `resumed` | `resumed` |
+| Tecla tras `systemd-inhibit --what=idle sleep 1` | **nada** | `resumed` |
+| 3 s después | **`idled` otra vez, sin `resumed`** | — |
+
+**El arreglo: un detector de vuelta.** Mientras dura el apagado, el vigilante lanza un **segundo
+hypridle** con config propio (`~/.config/ml4w-juanjo/hypridle-vuelta.conf`) que **ignora todos los
+inhibidores**: no se suscribe a ninguno, así que nunca pasa por `onInhibit()`. Tiene un único listener
+de 1 s cuyo `on-resume` es `idle-guard.sh accion pantallas-on detector`. Cubre ratón y teclado, no
+sondea nada, y el hypridle de la sesión queda intacto.
+
+Decisiones que no hay que rehacer:
+
+- **Descartado ignorar los inhibidores en el hypridle de la sesión** (`ignore_dbus_inhibit` +
+  `ignore_systemd_inhibit`). Quita la causa en dos líneas, pero entonces un vídeo ya no impediría que
+  se apagaran las pantallas.
+- **`on-timeout = true` no sobra.** Con `on-timeout` vacío hypridle da el listener por no disparado y
+  se salta también el `on-resume`.
+- **Al volver llegan los dos avisos casi a la vez**, así que `pantallas-on` *reclama* la marca con un
+  `rm` sin `-f`, que es atómico: solo el primero cicla el DPMS. El log dice quién pidió el encendido
+  (`encendido pedido por: hypridle | detector | atajo`) y el que llega segundo queda como `sin marca
+  de apagado (…)`. **Si en una vuelta solo aparece `detector`, acabas de ver el bug en acción.**
+- **`despertar-pantallas.sh` toma un `flock`.** Con el detector ya son cuatro los caminos que pueden
+  llegar a la vez, y dos ciclos de DPMS solapados se pisan.
+- **El vigilante es el dueño del detector**: se lo lleva al terminar por cualquier vía, también por
+  SIGTERM (de ahí su `sleep & wait`, para que la señal se atienda al instante).
+- **`aplicar.sh` y `check.sh` usan `pgrep`/`pkill -fx hypridle`** (línea de órdenes exacta), para no
+  confundir al hypridle de la sesión con el detector.
+- **`aplicar.sh` instala los dos scripts con `mv`, no con `cp` encima.** El vigilante es un bash que
+  puede llevar horas ejecutando `idle-guard.sh`, y bash lee su script a trozos: sobrescribir el mismo
+  inodo le haría ejecutar un fragmento del script nuevo al terminar.
+
+> Si hypridle arregla #208 upstream, el detector sobraría — pero no estorba.
 
 ### Dos comportamientos que no son bugs
 

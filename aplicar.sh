@@ -96,28 +96,37 @@ cp -f "$ROOT/overlay/ml4w-juanjo/scripts/cava-enlazar-audio.sh" \
 chmod +x "$DEST/ml4w-juanjo/scripts/cava-enlazar-audio.sh"
 cp -f "$ROOT/overlay/hypr/custom.lua" "$DEST/hypr/custom.lua"
 
-# 8b. Todo lo que cuelga de hypridle. Tres piezas:
+# 8b. Todo lo que cuelga de hypridle. Cuatro piezas:
 #     - despertar-pantallas.sh: encendido robusto al reanudar. La línea de serie disparaba
 #       `dpms enable` una sola vez y a ciegas, y dejaba la pantalla en negro (issue #1).
 #     - idle-guard.sh: guardián de la inactividad. Los on-timeout de bloqueo, apagado de
 #       pantallas y suspensión pasan por él, para poder desactivarlos por separado desde el botón
 #       de la barra sin tocar el config ni reiniciar el daemon. Ver cabecera del script.
+#     - hypridle-vuelta.conf: config del DETECTOR DE VUELTA, un segundo hypridle que idle-guard.sh
+#       lanza solo mientras las pantallas están apagadas, porque el on-resume del de la sesión se
+#       pierde (hypridle#208). Va a nuestro namespace, como los scripts.
 #     - hypridle.conf, que SÍ es fichero de ML4W (~/.config/hypr es symlink a su árbol) → se
 #       repone en cada update, por eso check.sh lo vigila a 3 estados.
 #     Los dos scripts van a nuestro namespace (~/.config/ml4w-juanjo/) → el updater nunca los
 #     poda. El guardián NO va con los scripts del theme a propósito: hypridle depende de él y no
 #     debe romperse si algún día se cambia de theme de waybar.
-cp -f "$ROOT/overlay/ml4w-juanjo/scripts/despertar-pantallas.sh" \
-      "$DEST/ml4w-juanjo/scripts/despertar-pantallas.sh"
-chmod +x "$DEST/ml4w-juanjo/scripts/despertar-pantallas.sh"
-cp -f "$ROOT/overlay/ml4w-juanjo/scripts/idle-guard.sh" \
-      "$DEST/ml4w-juanjo/scripts/idle-guard.sh"
-chmod +x "$DEST/ml4w-juanjo/scripts/idle-guard.sh"
+#     Con `mv` y NO con `cp` encima: el vigilante de idle-guard.sh es un bash que puede llevar horas
+#     ejecutándose, y bash lee su script A TROZOS. Sobrescribir el fichero en el sitio (mismo
+#     inodo) haría que al terminar siguiera leyendo el script NUEVO desde una posición del viejo, y
+#     ejecutara un fragmento cualquiera. Con mv el proceso vivo conserva su inodo intacto.
+for s in despertar-pantallas.sh idle-guard.sh; do
+  cp -f "$ROOT/overlay/ml4w-juanjo/scripts/$s" "$DEST/ml4w-juanjo/scripts/.$s.nuevo"
+  chmod +x "$DEST/ml4w-juanjo/scripts/.$s.nuevo"
+  mv -f "$DEST/ml4w-juanjo/scripts/.$s.nuevo" "$DEST/ml4w-juanjo/scripts/$s"
+done
+cp -f "$ROOT/overlay/ml4w-juanjo/hypridle-vuelta.conf" "$DEST/ml4w-juanjo/hypridle-vuelta.conf"
 cp -f "$ROOT/overlay/hypr/hypridle.conf" "$DEST/hypr/hypridle.conf"
 # Relanzar hypridle para que lea el config nuevo, pero SOLO si ya estaba corriendo: aplicar.sh
 # también debe poder ejecutarse desde un TTY sin sesión, y ahí no queremos dejar uno suelto.
-if pgrep -x hypridle >/dev/null; then
-  pkill -x hypridle || true
+# `-fx hypridle` y no `-x`: casa la línea de órdenes EXACTA, así que no toca al detector de vuelta
+# (`hypridle -c …/hypridle-vuelta.conf`) si hay un apagado en curso.
+if pgrep -fx hypridle >/dev/null; then
+  pkill -fx hypridle || true
   sleep 1
   setsid hypridle >/dev/null 2>&1 < /dev/null &
 fi

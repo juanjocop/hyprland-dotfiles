@@ -183,6 +183,16 @@ if [[ -f "$PID_VIGILANTE" ]]; then
     fi
 fi
 
+# 0.b UNA EJECUCIÓN A LA VEZ. Hay varios caminos que llegan aquí casi juntos (`after_sleep_cmd`, el
+#     `on-resume` de hypridle, el detector de vuelta de idle-guard.sh, SUPER+SHIFT+D) y dos ciclos de
+#     DPMS solapados se pisan: uno apaga mientras el otro comprueba. El segundo espera a que acabe
+#     el primero y, si aquel salió bien, el paso 0 lo omite por el $SELLO. Va DESPUÉS de parar al
+#     vigilante: ese no puede quedarse vivo mientras esperamos turno.
+BLOQUEO="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ml4w-juanjo/despertar.lock"
+mkdir -p "$(dirname "$BLOQUEO")"
+exec 9>"$BLOQUEO"
+flock -w 60 9 || log "AVISO: otro despertar lleva más de 60 s; sigo sin esperar más"
+
 # 0. Al reanudar se nos llama dos veces: `after_sleep_cmd` al despertar el sistema y, unos
 #    segundos después, el `on-resume` del listener de 11 min en cuanto el usuario mueve el ratón.
 #    Si la primera ya dejó las pantallas encendidas, la segunda solo aporta un parpadeo de más.

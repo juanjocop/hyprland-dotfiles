@@ -38,16 +38,19 @@ hl.bind(
 -- de hypridle no llegó nunca y la DP-2 se quedó negra 45 min (el porqué, en la cabecera de
 -- idle-guard.sh). En ese estado el botón de la barra no sirve de nada — no se ve. A ciegas, esta
 -- tecla sí. Tiene que ser un bind de Hyprland precisamente por eso: no depende de ver nada.
+-- Desde el 2026-09-13 el detector de vuelta de idle-guard.sh cubre ese caso solo; la tecla queda
+-- como red por debajo de la red.
 --
 -- Llama a la MISMA acción que hypridle en su `on-resume`: para al vigilante, borra la marca de
 -- apagado y cicla el DPMS con reintentos. Es inofensiva con las pantallas ya encendidas: sin
--- marca no cicla nada, solo lo anota en el log ("reanudación sin apagado previo").
+-- marca no cicla nada, solo lo anota en el log ("sin marca de apagado (atajo)"). El `atajo` del
+-- final solo sirve para que el log diga quién pidió el encendido.
 --
 -- D verificada libre: de las SUPER+SHIFT, ML4W ocupa A B G H M Q R S T W, los dígitos y las
 -- flechas; la C es nuestra (arriba).
 hl.bind(
     "SUPER + SHIFT + D",
-    hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/idle-guard.sh accion pantallas-on"),
+    hl.dsp.exec_cmd("~/.config/ml4w-juanjo/scripts/idle-guard.sh accion pantallas-on atajo"),
     { description = "Despertar pantallas (rescate del apagado por inactividad)" }
 )
 

@@ -107,6 +107,16 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
   lasts, capped at 3 tries). It **must** be killed by `despertar-pantallas.sh` before any wake-up,
   or it would undo the resume and reproduce issue #1. Full write-up in `README.md`.
 
+  The **idle screen-off has a black screen of its own, unrelated to the DP link: hypridle *loses*
+  the `on-resume`.** In hypridle 0.1.8 (same in `main`), when the inhibitor count (browser Wake
+  Locks via DBus ScreenSaver, or logind `idle`) drops to 0 while idle, `onInhibit()` destroys and
+  recreates its idle notifications, and Hyprland only sends `resumed` to a notification that had
+  reached `idled` — so real input wakes nothing (hyprwm/hypridle#208, **reproduced 2026-09-13**).
+  Fixed by the **detector de vuelta**: a second `hypridle -c ~/.config/ml4w-juanjo/hypridle-vuelta.conf`
+  that ignores every inhibitor, owned by the vigilante for the duration of the off period.
+  Fingerprint: the vigilante is still alive after you came back; with the fix, a return that logs
+  only `encendido pedido por: detector` in `idle-guard.log` is the bug caught in the act.
+
   Moral: if a black screen returns, check `coredumpctl` **before** blaming the driver, and never
   trust `hyprctl monitors` alone — after a DP reconnect its dpms state can lie, the short form
   **hides disabled connectors** (use `hyprctl monitors all`), and a monitor that is *absent* is
