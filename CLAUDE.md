@@ -99,6 +99,14 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
     chance. Fixed: success is measured against an explicit **expected-monitor list** (seeded from
     what's present plus the last good run, only ever grows, polls up to 8 s for a straggler), and
     the log now marks `DP-1=AUSENTE` / `DP-1=!1` (present but connector disabled).
+  - **The screen comes back on, but at 1080p** (2026-10-07). Same DP link drop, on the
+    *reconnect*: HPD fires before the EDID is readable, so aquamarine builds a generic monitor
+    (`description: Nvidia 0x0000`, `model: 0x0000`, fallback modes 1920x1080@60 / 1280x720 /
+    1024x768) and never re-reads the EDID until the next reconnect. `despertar-pantallas.sh`
+    (`reparar_edid`) forces one: `hl.monitor({ output = "DP-1", disabled = true })` (link drops in
+    ~4 s, EDID is re-read even while disabled), then `hyprctl reload` to re-enable. Verified:
+    re-applying `hl.monitor` with the mode but **without** `disabled = false` leaves it disabled,
+    and `reload` discards `eval`-added rules. Log marks it `DP-1=1(sin EDID)`.
 
   The **same DP link drop has a second consequence, on the way *out***: when DP-1 (the KTC H27E6)
   reasserts HPD, Hyprland treats it as a **new** monitor and **modesets** it — which lights the

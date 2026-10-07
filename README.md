@@ -420,6 +420,24 @@ dos motivos:
 
   Peor aún: al darlo por bueno escribía el `$SELLO`, y el sello **anula la segunda oportunidad**
   del `on-resume`. La DP-1 se quedó negra.
+- **Sin EDID: encendida, pero a 1080p** (visto el 2026-10-07, 12:20). No es negro, pero tiene la
+  misma causa. Al **reconectar** tras el tirón, la DP-1 avisa de que está conectada antes de que
+  su EDID se pueda leer, y aquamarine crea un **monitor genérico**. `hyprctl monitors all` lo
+  delata:
+
+  ```
+  description: Nvidia 0x0000          ← en vez de "Shenzhen KTC Technology Group H27E6"
+  availableModes: 1920x1080@60.00Hz 1280x720@60.00Hz 1024x768@60.00Hz
+  ```
+
+  aquamarine solo lee el EDID al conectar. Aunque el kernel ya lo tenga bueno
+  (`/sys/class/drm/card1-DP-1/edid`), Hyprland no se entera hasta la siguiente reconexión. El
+  arreglo **provoca esa reconexión**: desactiva la salida (`hl.monitor({ output = "DP-1",
+  disabled = true })`, y el monitor suelta el enlace a los ~4 s), espera a que vuelva con su
+  EDID y la reactiva con `hyprctl reload`. Hay que usar `reload` porque un `hl.monitor` con el
+  modo pero **sin** `disabled = false` deja la salida desactivada, y el `reload` descarta las
+  reglas puestas con `eval` y reaplica las de `monitors.lua`. En el log aparece como
+  `DP-1=1(sin EDID)`.
 
 Por eso `despertar-pantallas.sh` **espera** a que la sesión esté activa y luego **cicla** el DPMS
 (apagar + encender) con reintentos, en vez de solo encender. El ciclo es incondicional a
