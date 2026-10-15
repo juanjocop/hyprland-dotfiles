@@ -112,7 +112,10 @@ themes moves everything), `<variation>/style.css` (look), `<variation>/config.sh
   reasserts HPD, Hyprland treats it as a **new** monitor and **modesets** it — which lights the
   panel back up. So the idle screen-off didn't stick: DP-1 came back on ~8 s later and stayed on.
   Fixed by the **vigilante** in `idle-guard.sh` (re-applies the dpms off while the off period
-  lasts, capped at 3 tries). It **must** be killed by `despertar-pantallas.sh` before any wake-up,
+  lasts). Since 2026-10-15 it is **uncapped while the return detector is alive**: the KTC now
+  bounces forever (~8.5 s, any refresh rate), invisible at a 0.5 s poll, and the old 3-try cap
+  gave up and turned everything on, so the screens never stayed off. Without a detector the cap
+  of 3 + undo still applies. It **must** be killed by `despertar-pantallas.sh` before any wake-up,
   or it would undo the resume and reproduce issue #1. Full write-up in `README.md`.
 
   The **idle screen-off has a black screen of its own, unrelated to the DP link: hypridle *loses*

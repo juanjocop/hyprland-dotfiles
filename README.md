@@ -541,7 +541,7 @@ Se veía doble, porque el ciclo incondicional del apagado sumaba lo suyo: la 1 e
 y luego se encendían las dos. Arreglando la causa desaparecen los dos síntomas.
 
 `idle-guard.sh` lanza un **vigilante** que vive solo mientras dura el apagado: sondea `hyprctl
-monitors` cada 2 s y **reaplica el apagado** si alguna pantalla aparece encendida. Se sondea en vez
+monitors` cada 0,5 s y **reaplica el apagado** si alguna pantalla aparece encendida. Se sondea en vez
 de escuchar el socket2 de Hyprland porque el bucle solo vive durante el apagado y así no hacen
 falta `socat` ni `nc -U`, que no están garantizados en las dos máquinas.
 
@@ -551,6 +551,8 @@ falta `socat` ni `nc -U`, que no están garantizados en las dos máquinas.
    lo apagamos esto sería un ping-pong de parpadeos; tras 3 intentos se rinde, y entonces **borra la
    marca y llama a `despertar-pantallas.sh` para encenderlo todo**, con el motivo en el log.
    *Medido en 7 ciclos reales: normalmente `reaplico apagado (1/3)` y nunca una segunda vez.*
+   **Desde el 2026-10-15 este tope solo rige si no hay detector de vuelta** — ver [La DP-1 que
+   rebota sin fin](#la-dp-1-que-rebota-sin-fin-2026-10-15).
 2. **Muere solo** si desaparece la marca o si `hyprctl` no contesta —hereda
    `HYPRLAND_INSTANCE_SIGNATURE`, así que **solo puede tocar su propia sesión** de Hyprland—. A las
    8 h deja de reaplicar el apagado, pero **sigue vivo mientras viva el detector de vuelta** (ver
@@ -600,6 +602,39 @@ debajo de la red:
 | Tecla | Qué hace |
 |---|---|
 | **SUPER+SHIFT+D** | Despierta las pantallas a mano. Es la misma acción que el `on-resume` de hypridle: para al vigilante (y al detector), borra la marca y cicla el DPMS con reintentos. Inofensiva con las pantallas ya encendidas (sin marca no cicla nada). |
+
+#### La DP-1 que rebota sin fin (2026-10-15)
+
+Síntoma: **las pantallas no se apagaban por inactividad**, con el café puesto o sin él. El apagado sí
+se disparaba, pero desde el **2026-10-06** `idle-guard.log` repetía en *todos* los apagados
+`reaplico apagado (1/3)`, `(2/3)`, `(3/3)`, `me rindo tras 3 intentos`, `deshago el apagado`. A los
+~30 s estaba todo encendido.
+
+Lo que cambió es el KTC: antes rebotaba **una vez** y se dormía; ahora rebota **siempre**, cada
+~8,5 s, sin fin. Prueba controlada: **14 rebotes en 2 min**, **igual a 240 que a 144 Hz** (no es el
+límite de ancho de banda de HBR3 a 240 Hz, sospechoso del negro del 2026-09-18). Cada rebote es `Connector DP-1 disconnected` →
+`connected` (a veces primero sin EDID, `Nvidia 0x0000` a 1080p) → `Modesetting`, y en el journal se
+desconecta con él el hub USB del monitor (`usb 1-3.4.4`). Coincide con la actualización del 4/10
+(kernel 7.2.8 → 7.2.9, `nvidia-open`, hyprland 0.56.2-4.1) y con NVIDIA 615.78 del 8/10; **no se ha
+aislado** si es el driver o el monitor (pendiente: arrancar con el kernel LTS).
+
+Por qué no se arregla dando margen: cada vez que el monitor reaparece, **Hyprland le manda imagen
+por su cuenta** (modeset de monitor nuevo), así que el rato sin señal que el KTC necesita para
+entrar en ahorro se corta solo, se reapague rápido o despacio. Por qué el ASUS (DP-2), con el mismo
+*autosource* en el menú, no lo hace: al perder señal **sigue conectado** — nunca hay un `Connector
+DP-2 disconnected`; el KTC se desconecta del todo.
+
+Lo que sí se midió: **reapagando sin rendirse y sondeando cada 0,5 s, las dos pantallas se ven
+negras todo el rato** — el rebote no llega a verse. El KTC no entra en ahorro (panel negro, no
+dormido), pero el apagado se sostiene. Así que el tope de 3 era el que rompía el apagado, y ya no
+protegía de nada: el miedo del freno 1 (una pantalla muerta que nadie enciende) lo cubre hoy el
+detector de vuelta, que no depende del `on-resume` de hypridle. Arreglo en `idle-guard.sh`:
+
+- **Con el detector vivo, sin tope** (hasta las 8 h de siempre). **Sin detector, el tope de 3 y
+  deshacer**, como antes: ahí solo queda el `on-resume`, y es el caso del 2026-08-06.
+- Sondeo a **0,5 s** (era 2 s): es el intervalo con el que se verificó que no se ve.
+- El log anota **el primer reapagado y un resumen** (`fin del apagado; N reapagados en total`), no
+  cada uno: una noche serían miles de líneas y el log se recorta a 200.
 
 ### El aviso de vuelta que se perdía (hypridle#208)
 

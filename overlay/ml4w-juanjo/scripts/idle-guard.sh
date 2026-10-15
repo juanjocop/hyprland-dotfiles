@@ -44,8 +44,8 @@ DETECTOR_LOG="$HOME/.cache/ml4w-juanjo/hypridle-vuelta.log"
 DESPERTAR="$HOME/.config/ml4w-juanjo/scripts/despertar-pantallas.sh"
 SENAL=10           # = "signal" de los cuatro módulos de waybar (1, 8 y 9 ya están cogidas)
 
-VIG_INTERVALO=2    # s entre sondeos del vigilante
-VIG_MAX_REAP=3     # veces que reaplica el apagado antes de rendirse (evita el ping-pong infinito)
+VIG_INTERVALO=0.5  # s entre sondeos del vigilante (con 0,5 s el rebote de la DP-1 no llega a verse)
+VIG_MAX_REAP=3     # reaplicaciones antes de rendirse, SOLO si no hay detector de vuelta (freno 1)
 VIG_MAX_HORAS=8    # a partir de aquí deja de reaplicar el apagado (si hay detector, sigue vivo por él)
 
 ICONO_MAESTRO="󰅶"
@@ -116,6 +116,17 @@ emitir() { printf '{"text":"%s","tooltip":"%s","class":"%s"}\n' "$1" "$2" "$3"; 
 #      aviso llegue, así que el vigilante no puede irse dejando pantallas muertas. Si el apagado no
 #      se puede sostener, lo único coherente es encenderlo todo.
 #      La salida de emergencia por si aun así te quedas a oscuras: SUPER+SHIFT+D (custom.lua).
+#
+#      PERO EL TOPE SOLO VALE SIN DETECTOR DE VUELTA (cambio del 2026-10-15, no re-derivar). Desde
+#      el 2026-10-06 (kernel 7.2.9 + NVIDIA 615.x, o el firmware del KTC: no se ha aislado) la DP-1
+#      ya no rebota UNA vez y se duerme: rebota SIEMPRE, cada ~8,5 s, sin fin (14 rebotes en 2 min
+#      de prueba, igual a 240 que a 144 Hz). Con el tope de 3 el vigilante se rendía en TODOS los
+#      apagados y lo encendía todo a los ~30 s: las pantallas no se apagaban nunca. Medido ese día:
+#      reapagando sin rendirse y sondeando cada 0,5 s, las DOS se ven negras todo el rato (el KTC
+#      no llega a entrar en ahorro, pero el rebote no se ve). Y el miedo del freno 1 —una pantalla
+#      muerta que nadie enciende— lo cubre ya el detector de vuelta, que no depende de hypridle.
+#      Así que: con detector vivo se insiste sin tope (hasta $VIG_MAX_HORAS); sin él, se vuelve al
+#      tope de $VIG_MAX_REAP y a deshacer, porque entonces solo queda el `on-resume` de hypridle.
 #   2. Muere solo. Si desaparece la marca (volviste al equipo) o si `hyprctl` no contesta (Hyprland
 #      se ha reiniciado: hereda HYPRLAND_INSTANCE_SIGNATURE, así que solo puede tocar SU sesión).
 #      Pasadas $VIG_MAX_HORAS deja de reaplicar el apagado, pero NO se va mientras viva el detector
@@ -152,7 +163,10 @@ vigilante() {
     # hasta $VIG_INTERVALO s, con el detector aún vivo y pudiendo volver a disparar.
     # Se mata por la variable, no por el fichero: si un vigilante nuevo nos ha relevado, el fichero
     # ya apunta a SU detector.
-    trap '[[ -n "$det_pid" ]] && parar_detector "$det_pid"; exit 0' TERM
+    # Con detector se reaplica en cada rebote de la DP-1 (cada ~8,5 s): se anota el primero y un
+    # resumen al acabar, no cada uno, o una noche fuera se comería el log entero (se recorta a 200).
+    resumen() { (( reaplicaciones > 1 )) && log "vigilante: fin del apagado; $reaplicaciones reapagados en total"; }
+    trap 'resumen; [[ -n "$det_pid" ]] && parar_detector "$det_pid"; exit 0' TERM
     arrancar_detector && det_pid=$(<"$PID_DETECTOR")
     while sleep "$VIG_INTERVALO" & wait $!; do
         [[ -f "$MARCA_APAGADAS" ]] || break            # has vuelto al equipo: ya no pintamos nada
@@ -171,15 +185,21 @@ vigilante() {
         salida=$(hyprctl monitors 2>/dev/null) || { log "vigilante: hyprctl no contesta; salgo"; break; }
         grep -q 'dpmsStatus: 1' <<< "$salida" || continue
         encendidas=$(monitores_encendidos "$salida")
-        if (( reaplicaciones >= VIG_MAX_REAP )); then
-            log "vigilante: ${encendidas}se enciende(n) sola(s) una y otra vez; me rindo tras $VIG_MAX_REAP intentos"
+        # El tope solo con el detector muerto o ausente (ver el freno 1).
+        if [[ -z "$det_pid" ]] && (( reaplicaciones >= VIG_MAX_REAP )); then
+            log "vigilante: ${encendidas}se enciende(n) sola(s) una y otra vez y no hay detector de vuelta; me rindo tras $reaplicaciones intentos"
             rendido=1
             break
         fi
         (( reaplicaciones++ ))
-        log "vigilante: ${encendidas}se ha(n) encendido sola(s); reaplico apagado ($reaplicaciones/$VIG_MAX_REAP)"
+        if [[ -z "$det_pid" ]]; then
+            log "vigilante: ${encendidas}se ha(n) encendido sola(s); reaplico apagado ($reaplicaciones/$VIG_MAX_REAP, sin detector)"
+        elif (( reaplicaciones == 1 )); then
+            log "vigilante: ${encendidas}se ha(n) encendido sola(s); reaplico apagado (sin tope mientras viva el detector)"
+        fi
         hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })' >/dev/null 2>&1
     done
+    resumen
     [[ -n "$det_pid" ]] && parar_detector "$det_pid"
     # Solo si el fichero sigue siendo nuestro: si nos han relevado, es del vigilante nuevo.
     if [[ -f "$PID_VIGILANTE" && "$(<"$PID_VIGILANTE")" == "$$" ]]; then
